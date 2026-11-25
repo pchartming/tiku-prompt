@@ -1,0 +1,23 @@
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+dist/
+tools/logs/
+warm/
+.env.build
+.publish-denylist.txt
+*.apk
+*.aab
+*.jks
+*.keystore
+*.p12
+*.pfx
+local/
+
+# Python bytecode
+__pycache__/
+*.pyc
