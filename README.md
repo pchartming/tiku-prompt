@@ -126,7 +126,14 @@ GitHub 和 Gitee 不是默认目标。只有仓库所有者明确授权后，才
 ./tools/release.sh publish-github --authorize-github --execute
 ```
 
-debug APK 不是发布产物。发布密钥、密码和 GitHub token 不进入公开源码或发布产物；私钥备份只能放在受控的私有存储中，且不得合并到 `main` 或推送到 GitHub/Gitee。完整流程、密钥管理和失败重试见 [docs/RELEASING.md](docs/RELEASING.md)。
+GitHub Release 发布后，可将同一 tag、源码状态和四个 Release 资产镜像到 Gitee；Gitee 不是独立发布源，已有资产不会被覆盖：
+
+```bash
+./tools/release.sh publish-gitee --authorize-gitee
+./tools/release.sh publish-gitee --authorize-gitee --execute --confirm-mirror
+```
+
+debug APK 不是发布产物。发布密钥、密码、GitHub token 和 Gitee token 不进入公开源码或发布产物；私钥备份只能放在受控的私有存储中，且不得合并到 `main` 或推送到 GitHub/Gitee。完整流程、密钥管理和失败重试见 [docs/RELEASING.md](docs/RELEASING.md)。
 
 ## 许可证
 

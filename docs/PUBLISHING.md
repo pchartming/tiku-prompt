@@ -4,8 +4,8 @@ The **private upstream `origin` is the default publication target**. GitHub and
 Gitee are opt-in destinations: the source scripts refuse them unless an explicit
 authorization flag is supplied, and no remote is contacted by a plain `check`.
 
-This document covers source publication. Signed APKs, tags, and GitHub Releases
-are a separate, separately authorized flow in
+This document covers source publication. Signed APKs, tags, GitHub Releases, and
+the Gitee Release mirror are a separate, separately authorized flow in
 [RELEASING.md](RELEASING.md). The source scripts never create tags, publish
 APKs, create repositories, or change repository visibility.
 
@@ -34,11 +34,12 @@ git config user.email "<your-github-user-id>+pchartming@users.noreply.github.com
 
 Use only the project's public persona and GitHub noreply address. Do not use a
 legal name, personal email, or another project's identity in public commits.
-A Gitee mirror must use the same pseudonymous profile, publish only `main`, and
-never import other branches, tags, or histories. Keep required third-party
-attribution: a compatibility or privacy goal is not a reason to remove a
-licence notice. State compatibility as unofficial once; do not add repeated
-"no affiliation" or "no endorsement" disclaimers, which read as defensive.
+A Gitee mirror must use the same pseudonymous profile. It mirrors only GitHub's
+`main`, release tags, and published GitHub Release assets; never import other
+branches or histories. Keep required third-party attribution: a compatibility
+or privacy goal is not a reason to remove a licence notice. State compatibility
+as unofficial once; do not add repeated "no affiliation" or "no endorsement"
+disclaimers, which read as defensive.
 
 Local-only configuration is ignored by Git:
 
@@ -170,23 +171,27 @@ branch choice explicitly first.
 
 ## Gitee mirror (explicit authorization only)
 
-Gitee is an optional source mirror. The configured remote is
-`git@gitee.com:pchartming/tiku-prompt.git`; the public repository uses `main` as
-its default and only branch. Pushing still requires explicit authorization:
+Gitee is a mirror of GitHub, not an independent publication target. The
+configured remote is `git@gitee.com:pchartming/tiku-prompt.git`; the public
+repository uses `main` as its default and only branch. Pushing still requires
+explicit authorization:
 
 ```bash
 git remote add gitee git@gitee.com:pchartming/tiku-prompt.git  # one-time setup
 ```
 
-Then run:
+Source `main` is mirrored only after `github/main` equals `HEAD`:
 
 ```bash
 ./tools/publish.sh push-gitee --authorize-gitee
 ./tools/publish.sh push-gitee --authorize-gitee --execute --confirm-mirror
 ```
 
-This mirrors the source `main` branch only. It does not create or update Gitee
-Releases, tags, binaries, or repository descriptions.
+The source script fast-forwards `main` only; it does not create tags, Releases,
+or binaries. Release tags and assets are mirrored separately, after a GitHub
+Release exists, with `tools/release.sh publish-gitee`; see
+[RELEASING.md](RELEASING.md). The Gitee Release is pinned to the GitHub tag
+commit, and existing assets are verified rather than overwritten.
 
 ## APK and GitHub Release artifacts
 
@@ -200,10 +205,16 @@ certificate, and create a source archive with SHA-256 checksums. Publishing a ta
 or GitHub Release requires the explicit `--authorize-github` flag in addition to
 `--execute`.
 
+Mirroring the published GitHub Release to Gitee requires a separate explicit
+`--authorize-gitee` flag and a `TIKU_GITEE_TOKEN` owned by the `pchartming`
+Gitee account. The Gitee token is never committed. Do not reuse another
+project's token.
+
 Do not:
 - upload a debug APK or an unsigned APK;
 - overwrite an existing tag or release;
-- put the keystore, passwords, or a GitHub token in the published source or any
+- upload a Gitee Release asset that does not exist in the source GitHub Release;
+- put the keystore, passwords, or any token in the published source or any
   public remote;
 - make a release from a dirty worktree or a commit that is not on the public
   source branch.

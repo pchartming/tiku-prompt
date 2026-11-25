@@ -9,7 +9,8 @@ authorization.
 configured remote builder, signs it locally with a release key that is never
 committed, verifies the result, and prepares checksummed artifacts. The
 `publish-github` action is a separate opt-in step that pushes a tag and creates a
-GitHub Release. Nothing is published by the default action.
+GitHub Release. `publish-gitee` mirrors an already-published GitHub Release;
+GitHub remains the source of truth. Nothing is published by the default action.
 
 ## Release rules
 
@@ -27,6 +28,9 @@ GitHub Release. Nothing is published by the default action.
 - The script pins the signer certificate fingerprint. A debug certificate or a
   different certificate is rejected.
 - Existing releases and tags are never overwritten. There is no force push.
+- Gitee is a mirror, not an independent release source. Its `main` only
+  fast-forwards; its tag is only created when missing; its Release assets must
+  be byte-identical to the already-published GitHub Release.
 - The APK is verified for package, version, zip alignment, non-debuggable
   status, a single signer, and absence of `INTERNET`.
 - The source archive is produced with `git archive` from the same `HEAD` and
@@ -92,6 +96,15 @@ Never commit or paste the token into an issue, release note, or log.
 
 The GitHub remote must already exist and its `main` must point at the same
 commit. The script verifies both and does not push source code.
+
+### Gitee release token
+
+Only needed for `publish-gitee`. Create a Gitee personal access token owned by
+the `pchartming` account with permission to read the repository and manage
+Releases. Export it as `TIKU_GITEE_TOKEN` in the shell or keep it in the
+gitignored `.env.release` with mode `600`. Do not reuse a token from another
+project or account. The script verifies the token's login and refuses any other
+account; it never prints the token or writes it to the repository.
 
 ## Version and notes
 
@@ -188,6 +201,36 @@ The publish step is not run for a debug build, an unsigned APK, a checksum
 mismatch, a signer mismatch, or a dirty worktree. It does not change repository
 visibility.
 
+## Mirror the GitHub Release to Gitee
+
+Gitee is only updated after the GitHub Release is published. The mirror script
+downloads the four release assets from GitHub, verifies them against
+`SHA256SUMS` and `release-info.txt`, fast-forwards Gitee `main` if needed,
+creates the release tag only if it is missing, creates or reuses the Gitee
+Release pinned to the same commit, and uploads only missing assets. Existing
+Gitee assets are downloaded and compared; any difference aborts the mirror
+instead of overwriting.
+
+Dry-run first:
+
+```bash
+export TIKU_GITEE_TOKEN='<token owned by pchartming>'
+./tools/release.sh publish-gitee --authorize-gitee
+```
+
+After reviewing the output, execute:
+
+```bash
+./tools/release.sh publish-gitee --authorize-gitee --execute --confirm-mirror
+```
+
+The script refuses to run if `github/main` or the GitHub tag is not at local
+`HEAD`, if the GitHub Release or any expected asset is missing, if a Gitee tag
+already points elsewhere, if Gitee `main` is not an ancestor, or if an existing
+Gitee asset differs. It never force-pushes, moves or deletes a tag, or
+overwrites a Release asset. A Gitee Release body and name are copied from the
+GitHub Release.
+
 ## Verify the release
 
 - Open the GitHub Release and confirm all four assets are present.
@@ -195,6 +238,8 @@ visibility.
 - Confirm the release body is `docs/releases/<tag>.md`.
 - Confirm the APK signer fingerprint in `release-info.txt` matches the configured
   certificate.
+- If mirrored, confirm the Gitee Release has the same tag/commit and all four
+  assets; download them anonymously and verify they match `SHA256SUMS`.
 - Keep the release tag immutable.
 
 ## Failure and retry
@@ -208,6 +253,10 @@ visibility.
   retry from the same commit. Do not move or force-push the tag. If a draft
   release was created, delete that draft through the GitHub UI before retrying;
   the script refuses to reuse an existing release.
+- If `publish-gitee` fails after Gitee refs were pushed but before asset upload
+  completed, rerun the same command from the same commit. The operation is
+  idempotent: refs are no-ops and already-verified assets are skipped. Do not
+  delete or rewrite tags or assets to force a retry.
 - Do not delete or rewrite a published tag or release. Publish a new version
   instead.
 

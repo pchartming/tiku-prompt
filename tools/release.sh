@@ -6,12 +6,15 @@
 # built unsigned on the remote builder and signed locally; the release keystore
 # must live outside this repository. `publish-github` is opt-in and requires
 # explicit authorization; it pushes the tag and creates a GitHub Release.
+# `publish-gitee` mirrors an already-published GitHub Release.
 #
 # Usage:
 #   tools/release.sh check [--tag vX.Y.Z]
 #   tools/release.sh build [--tag vX.Y.Z]
 #   tools/release.sh publish-github --authorize-github [--tag vX.Y.Z]
 #                         [--execute]
+#   tools/release.sh publish-gitee --authorize-gitee [--tag vX.Y.Z]
+#                         [--execute --confirm-mirror]
 #
 # Configuration is read from the environment or a gitignored .env.release file:
 #   TIKU_RELEASE_KEYSTORE          release keystore path (outside this repo)
@@ -20,11 +23,15 @@
 #   TIKU_RELEASE_KEY_PASSWORD      key password (never committed)
 #   TIKU_RELEASE_CERT_SHA256       expected signer certificate SHA-256
 #   GH_TOKEN                       token owned by pchartming, for publish-github
+#   TIKU_GITEE_TOKEN               token owned by pchartming, for publish-gitee
 #   TIKU_RELEASE_NOTES_FILE        default docs/releases/<tag>.md
 #   TIKU_RELEASE_ENV_FILE          default .env.release
 #
-# Publishing does not force-push, rebuild a release, change repository
-# visibility, or publish a debug APK.
+# Gitee is a mirror of an already-published GitHub Release: it only fast-forwards
+# Gitee main, creates a missing release tag, and copies GitHub Release assets
+# byte-for-byte. It never force-pushes or overwrites existing release assets.
+# Publishing does not rebuild a release, change repository visibility, or
+# publish a debug APK.
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -65,20 +72,25 @@ usage() {
 ACTION="check"
 EXECUTE=0
 AUTHORIZE_GITHUB=0
+AUTHORIZE_GITEE=0
+CONFIRM_MIRROR=0
 TAG=""
 GITHUB_REPO="pchartming/tiku-prompt"
 API="https://api.github.com"
 GITHUB_REMOTE="github"
+GITEE_REMOTE="gitee"
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    check|build|publish-github)
+    check|build|publish-github|publish-gitee)
       ACTION="$1"; shift ;;
     --tag)
       [ $# -ge 2 ] || die "--tag requires a value"
       TAG="$2"; shift 2 ;;
     --execute) EXECUTE=1; shift ;;
     --authorize-github) AUTHORIZE_GITHUB=1; shift ;;
+    --authorize-gitee) AUTHORIZE_GITEE=1; shift ;;
+    --confirm-mirror) CONFIRM_MIRROR=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
@@ -451,6 +463,134 @@ read_remote_tag() {
   REMOTE_TAG_COMMIT="$peeled"
 }
 
+require_gitee_remote() {
+  local url
+  url="$(git remote get-url "$GITEE_REMOTE" 2>/dev/null || true)"
+  [ -n "$url" ] || die "Gitee remote '$GITEE_REMOTE' is not configured"
+  case "$url" in
+    *gitee.com*|*gitee.com:*) ;;
+    *) die "Gitee remote does not look like a Gitee URL: $url" ;;
+  esac
+  case "$url" in
+    *tiku-prompt*|*tiku-prompt.git*) ;;
+    *) die "Gitee remote does not point at a tiku-prompt repository: $url" ;;
+  esac
+}
+
+require_mirror_tools() {
+  local c
+  for c in git python3; do
+    command -v "$c" >/dev/null 2>&1 || die "missing command: $c"
+  done
+  python3 -c 'import requests' >/dev/null 2>&1 \
+    || die "python3 requests is required for Gitee mirroring"
+}
+
+query_gitee_main() {
+  git ls-remote --heads "$GITEE_REMOTE" refs/heads/main | awk 'NR==1 {print $1}'
+}
+
+query_gitee_tag() {
+  local lines peeled
+  lines="$(git ls-remote --tags "$GITEE_REMOTE" "refs/tags/$TAG" "refs/tags/$TAG^{}")" \
+    || die "failed to query $GITEE_REMOTE tags"
+  [ -n "$lines" ] || return 0
+  peeled="$(printf '%s\n' "$lines" | awk '/\^\{\}$/ {print $1}' | head -1)"
+  if [ -z "$peeled" ]; then
+    peeled="$(printf '%s\n' "$lines" | awk '{print $1}' | head -1)"
+  fi
+  printf '%s\n' "$peeled"
+}
+
+check_gitee_refs() {
+  local head
+  head="$(git rev-parse HEAD)"
+  GITEE_MAIN_COMMIT="$(query_gitee_main)" \
+    || die "failed to query $GITEE_REMOTE/main"
+  GITEE_TAG_COMMIT="$(query_gitee_tag)" \
+    || die "failed to query $GITEE_REMOTE tag $TAG"
+  if [ -n "$GITEE_TAG_COMMIT" ] && [ "$GITEE_TAG_COMMIT" != "$head" ]; then
+    die "Gitee tag $TAG points at ${GITEE_TAG_COMMIT:0:12}, not ${head:0:12}; refusing to rewrite an existing tag"
+  fi
+  if [ -n "$GITEE_MAIN_COMMIT" ]; then
+    git fetch --quiet "$GITEE_REMOTE" main || die "failed to fetch ${GITEE_REMOTE}/main"
+    git cat-file -e "${GITEE_MAIN_COMMIT}^{commit}" 2>/dev/null \
+      || die "fetched commit for ${GITEE_REMOTE}/main is unavailable"
+    git merge-base --is-ancestor "$GITEE_MAIN_COMMIT" HEAD \
+      || die "Gitee main is not an ancestor of HEAD; refusing a non-fast-forward update"
+  fi
+}
+
+push_gitee_refs() {
+  local head final_main final_tag
+  head="$(git rev-parse HEAD)"
+  check_gitee_refs
+  if [ "$GITEE_MAIN_COMMIT" != "$head" ]; then
+    git push "$GITEE_REMOTE" HEAD:refs/heads/main \
+      || die "failed to fast-forward Gitee main"
+    ok "fast-forwarded gitee/main to $(git rev-parse --short=12 HEAD)"
+  fi
+  if [ "$GITEE_TAG_COMMIT" != "$head" ]; then
+    git rev-parse --quiet --verify "refs/tags/$TAG" >/dev/null \
+      || die "local release tag $TAG is missing"
+    git push "$GITEE_REMOTE" "refs/tags/$TAG" \
+      || die "failed to create Gitee tag $TAG"
+    ok "created Gitee tag $TAG"
+  fi
+  final_main="$(query_gitee_main)" || die "failed to verify Gitee main after push"
+  final_tag="$(query_gitee_tag)" || die "failed to verify Gitee tag after push"
+  [ "$final_main" = "$head" ] && [ "$final_tag" = "$head" ] \
+    || die "post-push mismatch: gitee/main=${final_main:-missing} gitee/tag=${final_tag:-missing} expected=$head"
+}
+
+publish_gitee() {
+  [ "$AUTHORIZE_GITEE" = 1 ] \
+    || die "Gitee mirroring requires explicit authorization: add --authorize-gitee"
+  [ "$EXECUTE" = 0 ] || [ "$CONFIRM_MIRROR" = 1 ] \
+    || die "Gitee mirroring requires --confirm-mirror"
+  require_clean_main
+  require_tag_not_moved
+  require_mirror_tools
+  require_github_remote
+  require_source_on_github
+  require_gitee_remote
+  read_remote_tag
+  [ -n "$REMOTE_TAG_COMMIT" ] \
+    || die "GitHub tag $TAG does not exist; publish the GitHub Release first"
+  [ "$REMOTE_TAG_COMMIT" = "$(git rev-parse HEAD)" ] \
+    || die "GitHub tag $TAG does not point at HEAD"
+
+  info "verifying published GitHub Release and assets"
+  python3 "$PROJECT_ROOT/tools/gitee_mirror.py" check \
+    --tag "$TAG" --expected-commit "$(git rev-parse HEAD)" \
+    || die "GitHub Release verification failed; refusing to mirror to Gitee"
+
+  check_gitee_refs
+  local main_display="missing" tag_display="missing"
+  [ -z "$GITEE_MAIN_COMMIT" ] || main_display="$(git rev-parse --short=12 "$GITEE_MAIN_COMMIT")"
+  [ -z "$GITEE_TAG_COMMIT" ] || tag_display="$(git rev-parse --short=12 "$GITEE_TAG_COMMIT")"
+  info "gitee/main=$main_display gitee/$TAG=$tag_display"
+  info "Gitee is a mirror of GitHub; no force push and no tag moves are possible"
+
+  if [ "$EXECUTE" != 1 ]; then
+    info "dry run only; would fast-forward/create Gitee refs and upload missing GitHub Release assets"
+    info "add --execute --confirm-mirror to mirror"
+    return 0
+  fi
+
+  [ -n "${TIKU_GITEE_TOKEN:-}" ] \
+    || die "TIKU_GITEE_TOKEN is required; use a Gitee token owned by pchartming"
+  python3 "$PROJECT_ROOT/tools/gitee_mirror.py" status \
+    --tag "$TAG" --expected-commit "$(git rev-parse HEAD)" >/dev/null \
+    || die "Gitee token/permission check failed"
+
+  push_gitee_refs
+  python3 "$PROJECT_ROOT/tools/gitee_mirror.py" upload \
+    --tag "$TAG" --expected-commit "$(git rev-parse HEAD)" \
+    || die "Gitee source refs were mirrored, but release asset upload failed; rerun after fixing the error"
+  ok "mirrored GitHub Release $TAG to Gitee"
+}
+
 publish_github() {
   [ "$AUTHORIZE_GITHUB" = 1 ] \
     || die "GitHub release publishing requires explicit authorization: add --authorize-github"
@@ -602,5 +742,8 @@ case "$ACTION" in
     ;;
   publish-github)
     publish_github
+    ;;
+  publish-gitee)
+    publish_gitee
     ;;
 esac

@@ -19,8 +19,9 @@
 #   GITLEAKS_BIN   Optional path to a gitleaks binary. Public pushes require it.
 #
 # "origin" is the private upstream. The GitHub remote must point at
-# pchartming/tiku-prompt. The optional Gitee mirror must be configured as the
-# "gitee" remote. Those two targets are opt-in by explicit authorization.
+# pchartming/tiku-prompt. The optional Gitee remote must point at
+# pchartming/tiku-prompt and is only updated after github/main equals HEAD.
+# Those two targets are opt-in by explicit authorization.
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -180,6 +181,18 @@ check_gitee_remote() {
   esac
 }
 
+require_github_main_at_head() {
+  local remote_lines remote_main head
+  check_github_remote
+  head="$(git rev-parse HEAD)"
+  remote_lines="$(git ls-remote --heads github refs/heads/main)" \
+    || die "failed to query github/main; Gitee is a mirror of GitHub"
+  remote_main="$(printf '%s\n' "$remote_lines" | awk 'NR==1 {print $1}')"
+  [ -n "$remote_main" ] || die "github/main does not exist; publish source to GitHub first"
+  [ "$remote_main" = "$head" ] \
+    || die "github/main is not at HEAD; publish source to GitHub before mirroring to Gitee"
+}
+
 preflight_push() {
   local require_gitleaks="$1" remote="$2" remote_lines remote_head
   [ "$EXECUTE" = 1 ] || info "dry run only; add --execute to push"
@@ -246,12 +259,13 @@ case "$ACTION" in
       || die "Gitee mirroring requires explicit authorization: add --authorize-gitee"
     [ "$EXECUTE" = 0 ] || [ "$CONFIRM_MIRROR" = 1 ] \
       || die "Gitee mirroring requires --confirm-mirror"
+    require_github_main_at_head
     check_gitee_remote
     preflight_push 0 gitee
     if [ "$EXECUTE" = 1 ]; then
       push_branch gitee
     else
-      info "would mirror HEAD to gitee/main; no changes made"
+      info "would mirror the GitHub-published HEAD to gitee/main; no changes made"
     fi
     ;;
 esac

@@ -12,13 +12,13 @@
 ## 公开身份与公开文案
 
 - 公开提交只使用 `pchartming <361227677+pchartming@users.noreply.github.com>`；不得使用真实姓名、个人邮箱或其他项目的提交身份。
-- GitHub 公开身份仅限 `pchartming`；Gitee 镜像必须使用同一化名，Gitee 显示名不得使用真实姓名。Gitee 只镜像 `main`，不得使用 `--all`、`--mirror` 或仓库导入同步其他分支或历史。
+- GitHub 公开身份仅限 `pchartming`；Gitee 镜像必须使用同一化名，Gitee 显示名不得使用真实姓名。Gitee 只镜像 GitHub 的 `main`、release tag 和 GitHub Release 资产，不得使用 `--all`、`--mirror` 或仓库导入同步其他分支或历史。
 - 公开文案在兼容性说明中写明“非官方兼容”即可；不要反复声明“无关联/无背书”，避免“此地无银三百两”式文案，也不得暗示不存在的官方背书。
 - 必须保留第三方许可证要求的署名；不得为了消除项目关联而删除 MIT 等许可证要求的版权和许可声明。PlanYourTV 的 MIT 许可包含 `Copyright (c) 2026 pengchujin` 与 `Copyright (c) 2026 PlanYourTV contributors` 两行，必须同时保留。
 
 ## 远端与默认推送规则
 
-默认只推私有的 `origin`。`github` 仅用于 `pchartming/tiku-prompt` 的公开源码和显式授权的 GitHub Release；`gitee` 已配置为 `git@gitee.com:pchartming/tiku-prompt.git`，仅镜像公开源码 `main`，且必须单独授权。
+默认只推私有的 `origin`。`github` 仅用于 `pchartming/tiku-prompt` 的公开源码和显式授权的 GitHub Release；`gitee` 已配置为 `git@gitee.com:pchartming/tiku-prompt.git`，仅镜像 GitHub 的公开源码 `main`、release tag 和已发布 GitHub Release 的资产，且必须单独授权。
 
 - 普通提交、日常同步、文档更新：只推私仓 `origin`。
 - 用户说“发布”“push”“上线”“部署”等模糊表述，不等于授权 GitHub 或 Gitee。必须由所有者明确指定目标平台后，才能使用对应的授权参数。
@@ -42,14 +42,14 @@ GitHub 源码发布（仅在所有者明确授权后；当前仓库为公开）�
 ./tools/publish.sh push-github --authorize-github --visibility public --execute --confirm-public
 ```
 
-Gitee 同步（默认不执行；仅在明确授权且远端已配置后）：
+Gitee 源码镜像（默认不执行；仅在明确授权且远端已配置后）：
 
 ```bash
 ./tools/publish.sh push-gitee --authorize-gitee
 ./tools/publish.sh push-gitee --authorize-gitee --execute --confirm-mirror
 ```
 
-Gitee 只同步源码 `main`，不发布 tag、Release 或二进制。
+Gitee 源码镜像只能发生在 `github/main == HEAD` 之后；它只做 fast-forward，不创建 tag、Release 或资产。Release tag 和资产由下面的 `publish-gitee` 负责。
 
 签名发布构建：
 
@@ -65,9 +65,17 @@ GitHub Release（仅在所有者明确授权后）：
 ./tools/release.sh publish-github --authorize-github --execute
 ```
 
+Gitee Release 镜像（仅在 GitHub Release 已发布且所有者明确授权后）：
+
+```bash
+./tools/release.sh publish-gitee --authorize-gitee
+./tools/release.sh publish-gitee --authorize-gitee --execute --confirm-mirror
+```
+
 - 不要用 `gh release create`、手写 `git tag`、`git push --tags` 或其他旁路命令替代这些脚本。
 - GitHub Release 前必须先完成 GitHub 源码发布，并确认 `github/main == HEAD`；tag 由 `release.sh` 创建和推送。
-- `GH_TOKEN` 必须属于仓库所有者 `pchartming`；不要使用其他个人 `gh` 会话发布。
+- Gitee Release 必须从已发布的 GitHub Release 镜像：`main` 只允许 fast-forward，tag 只允许新建；不得移动/删除 tag，不得覆盖已有 Release 资产，也不得上传 GitHub Release 之外的二进制。
+- `GH_TOKEN` 必须属于仓库所有者 `pchartming`；`TIKU_GITEE_TOKEN` 必须属于 Gitee 的 `pchartming` 账户，不得复用其他项目或其他账户的 token。两者都不要写入公开源码。
 - 任何脚本 dry-run 通过后，仍要检查输出再执行；不要跳过 `--authorize-github` / `--authorize-gitee` 的授权边界。
 
 ## 构建与部署规则
@@ -83,7 +91,7 @@ GitHub Release（仅在所有者明确授权后）：
 
 ## 密钥与敏感信息
 
-- `.env.release`、`.env.build`、`.publish-denylist.txt`、keystore、密码、`GH_TOKEN`、APK/AAB/`.idsig` 不得进入 `main` 或任何公开远端。
+- `.env.release`、`.env.build`、`.publish-denylist.txt`、keystore、密码、`GH_TOKEN`、`TIKU_GITEE_TOKEN`、APK/AAB/`.idsig` 不得进入 `main` 或任何公开远端。
 - 本机工作密钥为 `$HOME/keys/tiku-prompt-release.jks`，`.env.release` 权限必须为 `600`。
 - 私仓中存在仅用于发布密钥备份的私有分支。它是凭据存储，不是源码分支：
   - 永不合并或 cherry-pick 到 `main`；
@@ -98,6 +106,7 @@ GitHub Release（仅在所有者明确授权后）：
 - 直接 `git push` 到 GitHub/Gitee，或未经授权添加/修改这两个远端。
 - 本地 Gradle 构建、`sudo`、在构建机执行 Git、修改其他项目目录。
 - 把 debug APK、未签名 APK、缺少版本说明的构建当作发布。
+- 把 Gitee 当作独立发布源，或上传 GitHub Release 之外的 Gitee 资产。
 - 先创建 GitHub Release 再补源码发布。
 - 把私钥、密码、token、keystore 或密钥备份分支合并进公开源码。
 - 用 `--no-verify`、删除 tag、force push 或改写历史来“修复”发布问题。
@@ -109,4 +118,5 @@ GitHub Release（仅在所有者明确授权后）：
 3. 推私仓先 dry-run，再 `push-private --execute`。
 4. GitHub/Gitee 只有在当前任务有明确授权时才执行，并先查看 dry-run。
 5. 发布 APK 先 `./tools/release.sh check && ./tools/release.sh build`，再核对 `SHA256SUMS` 和 `release-info.txt`。
-6. 任何检查或钩子失败都停下来修复；不要绕过。
+6. Gitee 镜像必须等 GitHub Release 已发布；先 dry-run `./tools/release.sh publish-gitee --authorize-gitee`，确认 `github/main == HEAD`、tag 和资产一致后，再执行。
+7. 任何检查或钩子失败都停下来修复；不要绕过。
