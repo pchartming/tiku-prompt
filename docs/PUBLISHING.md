@@ -30,6 +30,15 @@ git config user.name "pchartming"
 git config user.email "<your-github-user-id>+pchartming@users.noreply.github.com"
 ```
 
+### Public identity
+
+Use only the project's public persona and GitHub noreply address. Do not use a
+legal name, personal email, or another project's identity in public commits.
+A Gitee mirror must use the same pseudonymous profile, publish only `main`, and
+never import other branches, tags, or histories. Keep required third-party
+attribution: a compatibility or privacy goal is not a reason to remove a
+licence notice.
+
 Local-only configuration is ignored by Git:
 
 - `.env.build` — remote-builder paths and SSH target
