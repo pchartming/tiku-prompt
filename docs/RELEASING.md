@@ -76,7 +76,8 @@ Keep passwords out of command history and shell arguments.
 
 The remote build configuration is `.env.build` (also ignored); see
 [README.md](../README.md). The release build uses that remote builder
-and does not run Gradle locally.
+and does not run Gradle locally. The current release certificate fingerprint is
+recorded in [RELEASE-KEY.md](RELEASE-KEY.md).
 
 ### GitHub release token
 
