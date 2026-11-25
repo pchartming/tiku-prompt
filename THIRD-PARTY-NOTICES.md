@@ -8,7 +8,7 @@ third-party data, app names, trademarks, or dependencies.
 
 - Files: `app/src/main/assets/quiz/curriculum.json`, `app/src/main/assets/quiz/unit_catalog.json`
 - Source project: PlanYourTV
-- Copyright: 2026 PlanYourTV contributors
+- Copyright: 2026 pengchujin; 2026 PlanYourTV contributors
 - License: MIT
 
 The bundled catalog is a title-only subset derived from PlanYourTV's textbook
@@ -22,6 +22,7 @@ The PlanYourTV catalog is distributed under the following license:
 ```text
 MIT License
 
+Copyright (c) 2026 pengchujin
 Copyright (c) 2026 PlanYourTV contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -43,33 +44,27 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+PlanYourTV's source code is also MIT-licensed. Any reused code must retain the
+copyright and permission notice above.
+
 ## National Smart Education Platform
 
 The course titles in the catalog were compiled from the public curriculum
-catalog at <https://basic.smartedu.cn/>. Tiku Prompt is not affiliated with or
-endorsed by the platform. Textbook names, unit names, and lesson titles may be
-subject to their respective rights. No textbook content is bundled.
+catalog at <https://basic.smartedu.cn/>. Textbook names, unit names, and lesson
+titles may be subject to their respective rights. No textbook content is bundled.
 
 ## StudyOnTV / 题了个题
 
-StudyOnTV is a separate third-party application. Its format specification in
-this repository was written independently from public documentation; no
-StudyOnTV source code, application resources, or bundled assets are included.
-StudyOnTV's own license terms apply to StudyOnTV. This project's compatibility
-is unofficial.
-
-"StudyOnTV" and "题了个题" are used only to identify the third-party app and
-its import format.
+StudyOnTV / 题了个题 is a third-party application with its own license terms.
+The import-format description in this repository is based on public
+documentation. Compatibility is unofficial and may change when StudyOnTV
+changes.
 
 ## 学习锁
 
-学习锁 is a separate, closed-source third-party application. This repository
-contains no 学习锁 code, APK resources, question banks, or extracted assets. The
-format description and prompt are independently written compatibility notes for
-a JSON import shape that can be observed from the app's public behavior. The
-compatibility is unofficial and may change without notice.
-
-"学习锁" is used only to identify the third-party app and its import format.
+学习锁 is a free, closed-source third-party application. The format description
+and prompt document a publicly observable JSON import shape. Compatibility is
+unofficial and may change without notice.
 
 ## Build and runtime dependencies
 
@@ -91,6 +86,6 @@ The Android SDK and build tools are not redistributed by this repository.
 ## Trademarks
 
 Android, Google Play, Kotlin, Jetpack, and related marks are trademarks of their
-respective owners. PlanYourTV, StudyOnTV / 题了个题, and 学习锁 are names of
-separate projects or products. Their use here is descriptive and does not imply
-endorsement, partnership, or an official build.
+respective owners. PlanYourTV, StudyOnTV / 题了个题, and 学习锁 are third-party
+project or product names used descriptively to identify compatible formats and
+data provenance.

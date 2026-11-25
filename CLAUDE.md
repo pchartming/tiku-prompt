@@ -6,15 +6,15 @@
 
 - 这是一个完全离线的 Android AI 提示词生成器，不调用模型、不需要 API Key，`AndroidManifest.xml` 中不得出现 `INTERNET` 权限。
 - 应用包名/命名空间/applicationId 为 `io.github.pchartming.tikuprompt`。
-- 不复制 StudyOnTV、PlanYourTV、学习锁等第三方 App 的源码、资源、题库或未公开材料；兼容性说明必须标明为非官方。
+- PlanYourTV 的 MIT 源码可以引用或修改，但必须保留版权和许可声明；不得复制 StudyOnTV、学习锁等未授权源码、资源、题库或未公开材料。兼容性说明必须标明为非官方。
 - 公开产物不得包含个人邮箱、绝对家目录路径、私有网络地址、私有主机名或内部项目标识。
 
 ## 公开身份与公开文案
 
 - 公开提交只使用 `pchartming <361227677+pchartming@users.noreply.github.com>`；不得使用真实姓名、个人邮箱或其他项目的提交身份。
 - GitHub 公开身份仅限 `pchartming`；Gitee 镜像必须使用同一化名，Gitee 显示名不得使用真实姓名。Gitee 只镜像 `main`，不得使用 `--all`、`--mirror` 或仓库导入同步其他分支或历史。
-- 公开文案只能写“非官方兼容/非官方组件”，不得声称与任何目标 App 的开发者“无关联”，也不得暗示不存在的官方背书。
-- 必须保留第三方许可证要求的署名；不得为了消除项目关联而删除 MIT 等许可证要求的版权和许可声明。
+- 公开文案在兼容性说明中写明“非官方兼容”即可；不要反复声明“无关联/无背书”，避免“此地无银三百两”式文案，也不得暗示不存在的官方背书。
+- 必须保留第三方许可证要求的署名；不得为了消除项目关联而删除 MIT 等许可证要求的版权和许可声明。PlanYourTV 的 MIT 许可包含 `Copyright (c) 2026 pengchujin` 与 `Copyright (c) 2026 PlanYourTV contributors` 两行，必须同时保留。
 
 ## 远端与默认推送规则
 

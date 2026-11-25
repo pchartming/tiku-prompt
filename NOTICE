@@ -1,26 +1,29 @@
 Tiku Prompt (题库提示词)
 Copyright (c) 2026 pchartming
 
-Tiku Prompt is an independent, unofficial prompt-generation tool. It assembles
-text prompts locally and does not call an AI service, require an API key, or
-request network access. It is not an official component of StudyOnTV / 题了个题,
-PlanYourTV, or 学习锁; those names are used only to describe compatible import
-formats and data provenance.
+Tiku Prompt is an offline prompt-generation tool. It assembles text prompts
+locally and does not call an AI service, require an API key, or request network
+access. It supports unofficial import compatibility with StudyOnTV / 题了个题,
+PlanYourTV, and 学习锁; those names describe compatible import formats and data
+provenance.
 
 The bundled course catalog is derived from PlanYourTV's textbook catalog asset,
 which is licensed under the MIT License:
 
+  Copyright (c) 2026 pengchujin
   Copyright (c) 2026 PlanYourTV contributors
 
 The catalog contains textbook, unit, and lesson titles only. It does not contain
 textbook body text, images, question banks, answers, or third-party app assets.
 The titles are compiled from the public curriculum catalog of the National Smart
-Education Platform (国家中小学智慧教育平台, https://basic.smartedu.cn/). This
-project claims no endorsement by that platform.
+Education Platform (国家中小学智慧教育平台, https://basic.smartedu.cn/).
 
-No source code, application resources, APKs, or question banks from StudyOnTV or
-学习锁 are included. Their names are used only to describe compatible import
-formats; compatibility is unofficial and may break when those apps change.
+PlanYourTV's source code is also available under the MIT License. Any reused
+PlanYourTV code must retain the same copyright and permission notice.
+
+StudyOnTV / 题了个题 and 学习锁 are third-party applications. Their names
+identify compatible import formats; compatibility is unofficial and may break
+when those apps change.
 
 Third-party dependencies and the full PlanYourTV MIT notice are listed in
 THIRD-PARTY-NOTICES.md. The project's own source is licensed under the MIT

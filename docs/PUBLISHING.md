@@ -37,7 +37,8 @@ legal name, personal email, or another project's identity in public commits.
 A Gitee mirror must use the same pseudonymous profile, publish only `main`, and
 never import other branches, tags, or histories. Keep required third-party
 attribution: a compatibility or privacy goal is not a reason to remove a
-licence notice.
+licence notice. State compatibility as unofficial once; do not add repeated
+"no affiliation" or "no endorsement" disclaimers, which read as defensive.
 
 Local-only configuration is ignored by Git:
 
