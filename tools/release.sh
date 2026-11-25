@@ -561,6 +561,10 @@ publish_gitee() {
     || die "GitHub tag $TAG does not exist; publish the GitHub Release first"
   [ "$REMOTE_TAG_COMMIT" = "$(git rev-parse HEAD)" ] \
     || die "GitHub tag $TAG does not point at HEAD"
+  if ! git rev-parse --quiet --verify "refs/tags/$TAG" >/dev/null; then
+    git fetch --quiet "$GITHUB_REMOTE" "refs/tags/$TAG:refs/tags/$TAG" \
+      || die "failed to fetch GitHub tag $TAG for Gitee mirroring"
+  fi
 
   info "verifying published GitHub Release and assets"
   python3 "$PROJECT_ROOT/tools/gitee_mirror.py" check \
