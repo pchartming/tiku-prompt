@@ -81,7 +81,7 @@ app/src/main/
   java/.../prompt/      目标 Profile 元数据、表单校正、提示词拼接
   java/.../ui/          Compose 界面与 ViewModel
 app/src/test/           纯 JVM 单元测试
-tools/                  构建与发布检查工具
+tools/                  构建、发布检查与 Release 工具
 ```
 
 添加新的答题 App 格式时，通常只需要：
@@ -109,6 +109,24 @@ tools/                  构建与发布检查工具
 
 GitHub 和 Gitee 不是默认目标。只有仓库所有者明确授权后，才能分别使用
 `--authorize-github` / `--authorize-gitee`；脚本不会在默认或检查流程中联系这两个远端。详细流程见 [docs/PUBLISHING.md](docs/PUBLISHING.md)。
+
+## 发布 APK 与源码
+
+正式 APK 由 `tools/release.sh` 在远程构建机生成未签名包，再在本地使用仓库外的发布密钥签名。脚本会校验包名、版本、签名证书、对齐、调试标志和权限，并生成源码包与 SHA-256 校验和：
+
+```bash
+./tools/release.sh check
+./tools/release.sh build
+```
+
+产物位于 `dist/release/<tag>/`，不会进入 Git。GitHub Release 的上传是单独的显式授权步骤：
+
+```bash
+./tools/release.sh publish-github --authorize-github
+./tools/release.sh publish-github --authorize-github --execute
+```
+
+debug APK 不是发布产物。发布密钥、密码和 GitHub token 只保存在本机，不提交。完整流程、密钥管理和失败重试见 [docs/RELEASING.md](docs/RELEASING.md)。
 
 ## 许可证
 

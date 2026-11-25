@@ -108,6 +108,10 @@ find_gitleaks() {
     command -v gitleaks
     return 0
   fi
+  if [ -n "${HOME:-}" ] && [ -x "$HOME/.local/bin/gitleaks" ]; then
+    printf '%s\n' "$HOME/.local/bin/gitleaks"
+    return 0
+  fi
   return 1
 }
 

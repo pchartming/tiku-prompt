@@ -33,6 +33,7 @@ REQUIRED_FILES = {
 FORBIDDEN_SUFFIXES = (
     ".aab",
     ".apk",
+    ".idsig",
     ".iml",
     ".jks",
     ".keystore",

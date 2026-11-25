@@ -2,8 +2,9 @@
 # Optional remote build helper for low-memory development machines.
 #
 # The script syncs this repository to a Linux builder over SSH, runs Gradle
-# there, and copies the debug APK and unit-test report back to dist/. It does
-# not modify the builder's source tree, use sudo, or run Git on the builder.
+# there, and copies the selected APK (debug, or unsigned release) and unit-test
+# report back to dist/. It does not modify the builder's source tree, use sudo,
+# or run Git on the builder.
 #
 # Configuration is read from the environment, or from a gitignored .env.build
 # file in the repository root:
@@ -22,6 +23,7 @@
 #   ./tools/build_remote.sh [options]
 #
 #   --test              Also run :app:testDebugUnitTest
+#   --release           Build an unsigned release APK instead of debug
 #   --warm              Reuse the remote warm workspace and Gradle daemon
 #   --reset-warm        Delete the warm workspace, then exit without building
 #   --check             Check the remote toolchain and workspace, without building
@@ -81,6 +83,7 @@ usage() {
 WARM=0
 DO_TEST=0
 DO_CHECK=0
+VARIANT=debug
 DO_PRUNE=0
 DO_RESET_WARM=0
 KEEP=0
@@ -96,6 +99,7 @@ EXPECTED_PACKAGE="${TIKU_EXPECTED_PACKAGE:-$(sed -n 's/^[[:space:]]*applicationI
 while [ $# -gt 0 ]; do
   case "$1" in
     --test)        DO_TEST=1; shift ;;
+    --release)     VARIANT=release; shift ;;
     --warm)        WARM=1; shift ;;
     --reset-warm)  DO_RESET_WARM=1; shift ;;
     --check)       DO_CHECK=1; shift ;;
@@ -131,6 +135,19 @@ done
 
 [[ "$WORKERS" =~ ^[1-9][0-9]*$ ]] || die 2 "--workers 必须是正整数：$WORKERS"
 [[ "$WAIT" =~ ^[0-9]+$ ]] || die 2 "--wait 必须是非负整数：$WAIT"
+
+if [ "$VARIANT" = release ]; then
+  GRADLE_TASK=":app:assembleRelease"
+  REMOTE_APK_REL="app/build/outputs/apk/release/app-release-unsigned.apk"
+  REMOTE_APK_NAME="app-release-unsigned.apk"
+  DIST_APK_NAME="tiku-prompt-release-unsigned.apk"
+else
+  GRADLE_TASK=":app:assembleDebug"
+  REMOTE_APK_REL="app/build/outputs/apk/debug/app-debug.apk"
+  REMOTE_APK_NAME="app-debug.apk"
+  DIST_APK_NAME="tiku-prompt-debug.apk"
+fi
+DIST_METADATA_NAME="${DIST_APK_NAME%.apk}.metadata.txt"
 
 if [ "$DO_CHECK" = 0 ] && [ "$DO_PRUNE" = 0 ] && [ "$DO_RESET_WARM" = 0 ]; then
   :
@@ -321,10 +338,12 @@ sync_source() {
     --exclude '*.iml'
     --exclude '.DS_Store'
     --exclude '.env.build'
+    --exclude '.env.release'
     --exclude '.publish-denylist.txt'
     --exclude '__pycache__/'
     --exclude '*.pyc'
     --exclude '*.apk'
+    --exclude '*.idsig'
     --exclude '*.aab'
     --exclude '*.jks'
     --exclude '*.keystore'
@@ -359,10 +378,12 @@ write_remote_job() {
     printf 'PROXY=%q\n' "$PROXY"
     printf 'WAIT=%q\n' "$WAIT"
     printf 'WORKERS=%q\n' "$WORKERS"
-    local args=":app:assembleDebug"
+    printf 'VARIANT=%q\n' "$VARIANT"
+    local args="$GRADLE_TASK"
     [ "$DO_TEST" = 1 ] && args="$args :app:testDebugUnitTest"
     printf 'GRADLE_ARGS=(%s --build-cache --console=plain --stacktrace)\n' "$args"
-    printf 'APK_REL=%q\n' 'app/build/outputs/apk/debug/app-debug.apk'
+    printf 'APK_REL=%q\n' "$REMOTE_APK_REL"
+    printf 'APK_NAME=%q\n' "$REMOTE_APK_NAME"
   } > "$job"
 }
 
@@ -426,7 +447,7 @@ mv "$GP.tmp.$$" "$GP"
 
 RES="$ROOT/results/$RUNID"
 LOG="$RES/build.log"
-echo "[remote] 开始构建：assembleDebug$([ "$DO_TEST" = 1 ] && echo ' + 单元测试')（workers=$WORKERS）"
+echo "[remote] 开始构建：$VARIANT$([ "$DO_TEST" = 1 ] && echo ' + 单元测试')（workers=$WORKERS）"
 cd "$WS_ABS" || { echo "[remote] [x] 工作区不存在: $WS_ABS"; exit 7; }
 printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
 
@@ -444,7 +465,7 @@ status=failed
 if [ "$rc" -eq 0 ]; then
   mkdir -p "$RES/apk"
   if [ -f "$WS_ABS/$APK_REL" ]; then
-    cp -p "$WS_ABS/$APK_REL" "$RES/apk/app-debug.apk"
+    cp -p "$WS_ABS/$APK_REL" "$RES/apk/$APK_NAME"
     status=success
   else
     echo "[remote] [x] 构建成功但缺少产物: $APK_REL"
@@ -466,7 +487,7 @@ fi
 
 : > "$RES/manifest.tsv"
 if [ "$status" = "success" ]; then
-  apk="$RES/apk/app-debug.apk"
+  apk="$RES/apk/$APK_NAME"
   sha=$(sha256sum "$apk" | awk '{print $1}')
   pkg=""; vc=""; vn=""; perms=""
   if command -v aapt2 >/dev/null 2>&1; then
@@ -476,7 +497,7 @@ if [ "$status" = "success" ]; then
     vn=$(printf '%s\n' "$line" | sed -n 's/^.* versionName='"'"'\([^'"'"']*\)'"'"'.*/\1/p' | head -1)
     perms=$(aapt2 dump permissions "$apk" 2>/dev/null | sed -n 's/^uses-permission: name='"'"'\([^'"'"']*\)'"'"'.*/\1/p' | paste -sd, -)
   fi
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "app-debug.apk" "$sha" "$pkg" "$vc" "$vn" "$perms" >> "$RES/manifest.tsv"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$APK_NAME" "$sha" "$pkg" "$vc" "$vn" "$perms" >> "$RES/manifest.tsv"
 fi
 
 {
@@ -522,7 +543,9 @@ verify_local_apk() {
       "$(printf '%s\n' "$badging" | sed -n 's/^.* versionCode='"'"'\([^'"'"']*\)'"'"'.*/\1/p')"
     printf '  sdk:      %s\n' "$(printf '%s\n' "$badging" | sed -n 's/^sdkVersion:'"'"'\([^'"'"']*\)'"'"'.*/\1/p')"
   fi
-  if [ -x "$LOCAL_APKSIGNER" ] && [ -x "$LOCAL_JDK/bin/java" ]; then
+  if [ "$VARIANT" = release ]; then
+    printf '  signing:  unsigned release APK (sign locally before publishing)\n'
+  elif [ -x "$LOCAL_APKSIGNER" ] && [ -x "$LOCAL_JDK/bin/java" ]; then
     PATH="$LOCAL_JDK/bin:$PATH" "$LOCAL_APKSIGNER" verify --print-certs "$apk" >/dev/null 2>&1 \
       || { error "APK 签名校验失败"; return 1; }
     printf '  signing:  debug signature OK\n'
@@ -562,12 +585,12 @@ fetch_results() {
   local line base sha pkg vc vn perms
   line=$(head -1 "$tmp/manifest.tsv")
   IFS=$'\t' read -r base sha pkg vc vn perms <<< "$line"
-  [ -f "$tmp/apk/app-debug.apk" ] || { error "取回目录缺少 app-debug.apk"; return 7; }
+  [ -f "$tmp/apk/$REMOTE_APK_NAME" ] || { error "取回目录缺少 $REMOTE_APK_NAME"; return 7; }
 
   mkdir -p "$PROJECT_ROOT/dist"
-  local dest="$PROJECT_ROOT/dist/tiku-prompt-debug.apk"
-  cp -p "$tmp/apk/app-debug.apk" "$dest"
-  printf '%s  %s\n' "$sha" "tiku-prompt-debug.apk" > "$PROJECT_ROOT/dist/tiku-prompt-debug.apk.sha256"
+  local dest="$PROJECT_ROOT/dist/$DIST_APK_NAME"
+  cp -p "$tmp/apk/$REMOTE_APK_NAME" "$dest"
+  printf '%s  %s\n' "$sha" "$DIST_APK_NAME" > "$PROJECT_ROOT/dist/${DIST_APK_NAME}.sha256"
   {
     printf 'package=%s\n' "$pkg"
     printf 'versionCode=%s\n' "$vc"
@@ -575,7 +598,7 @@ fetch_results() {
     printf 'permissions=%s\n' "$perms"
     printf 'sha256=%s\n' "$sha"
     printf 'runid=%s\n' "$runid"
-  } > "$PROJECT_ROOT/dist/tiku-prompt-debug.metadata.txt"
+  } > "$PROJECT_ROOT/dist/$DIST_METADATA_NAME"
 
   log "校验取回的 APK ..."
   verify_local_apk "$dest" "$sha" "$pkg" "$vc" "$perms" || return 7
@@ -602,8 +625,8 @@ fi
 
 prepare_remote_dirs
 
-RUNID="$(hostname -s 2>/dev/null | tr -cd 'A-Za-z0-9._-')-debug-$(date +%Y%m%d_%H%M%S)-$$"
-[ -n "${RUNID%%-*}" ] || RUNID="client-debug-$(date +%Y%m%d_%H%M%S)-$$"
+RUNID="$(hostname -s 2>/dev/null | tr -cd 'A-Za-z0-9._-')-${VARIANT}-$(date +%Y%m%d_%H%M%S)-$$"
+[ -n "${RUNID%%-*}" ] || RUNID="client-${VARIANT}-$(date +%Y%m%d_%H%M%S)-$$"
 
 if [ "$WARM" = 1 ]; then
   WS_REL="$WARM_WS_REL"
@@ -629,7 +652,7 @@ ssh "${SSH_OPTS[@]}" "$REMOTE_SSH" "chmod 700 '$RUN_DIR/run.sh' '$RUN_DIR/job.en
 rm -f "$job_tmp" "$run_tmp"
 
 log "远端日志：$REMOTE_SSH:$REMOTE_ROOT_ABS/$RES_REL/build.log"
-log "===== 在远端构建机构建 [debug $([ "$DO_TEST" = 1 ] && echo '+ test')] ====="
+log "===== 在远端构建机构建 [$VARIANT $([ "$DO_TEST" = 1 ] && echo '+ test')] ====="
 
 rc=0
 ssh "${SSH_OPTS[@]}" "$REMOTE_SSH" "bash '$RUN_DIR/run.sh'" || rc=$?

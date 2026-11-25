@@ -9,8 +9,10 @@ dist/
 tools/logs/
 warm/
 .env.build
+.env.release
 .publish-denylist.txt
 *.apk
+*.idsig
 *.aab
 *.jks
 *.keystore

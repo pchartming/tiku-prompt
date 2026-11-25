@@ -1,12 +1,16 @@
 # Publishing workflow
 
 The **private upstream `origin` is the default publication target**. GitHub and
-Gitee are opt-in destinations: the scripts refuse them unless an explicit
-authorization flag is supplied, and no remote is contacted by `check`.
+Gitee are opt-in destinations: the source scripts refuse them unless an explicit
+authorization flag is supplied, and no remote is contacted by a plain `check`.
+
+This document covers source publication. Signed APKs, tags, and GitHub Releases
+are a separate, separately authorized flow in
+[RELEASING.md](RELEASING.md). The source scripts never create tags, publish
+APKs, create repositories, or change repository visibility.
 
 The process is deliberately boring: review, scan, test, dry-run, push without
-force. The scripts do not create tags, publish APKs, create repositories, or
-change repository visibility.
+force.
 
 ## One-time setup
 
@@ -29,9 +33,11 @@ git config user.email "<your-github-user-id>+pchartming@users.noreply.github.com
 Local-only configuration is ignored by Git:
 
 - `.env.build` — remote-builder paths and SSH target
+- `.env.release` — release keystore path and passwords; see
+  [RELEASING.md](RELEASING.md)
 - `.publish-denylist.txt` — additional private identifiers to reject
 
-Never force-add either file.
+Never force-add these files.
 
 ## Checks
 
@@ -58,16 +64,15 @@ and untracked publishable files. It rejects:
 
 `gitleaks` is run automatically when available. Set `GITLEAKS_BIN=/path/to/gitleaks`
 if it is not on `PATH`. A public GitHub push is refused unless gitleaks is
-available. The scan is a guardrail, not a proof: review the diff and any new
-data manually.
+available. The release workflow also requires it. The scan is a guardrail, not a
+proof: review the diff and any new data manually.
 
 ## Private push (default)
 
-1. Build and test the snapshot you intend to publish:
+1. Build and test the snapshot you intend to publish with the remote builder:
 
    ```bash
-   ./gradlew :app:testDebugUnitTest
-   ./gradlew :app:assembleDebug
+   ./tools/build_remote.sh --warm --test
    ```
 
 2. Commit on `main`. The worktree must be clean.
@@ -108,32 +113,50 @@ git remote -v
 Run a dry-run first:
 
 ```bash
-./tools/publish.sh push-github --authorize-github --visibility private
+./tools/publish.sh push-github --authorize-github
 ```
 
 Then execute only after reviewing the output and confirming the target:
 
 ```bash
-./tools/publish.sh push-github --authorize-github --visibility private --execute
+./tools/publish.sh push-github --authorize-github --execute
 ```
 
-A public release is a second, separate decision:
+### Making a private repository public safely
 
-1. Confirm the repository contents, history, and notices are acceptable.
-2. Change the GitHub repository visibility to public manually.
-3. Run a final dry-run with `--visibility public --authorize-github`.
-4. Push with explicit public confirmation and gitleaks installed:
+A repository's visibility is a separate owner decision. The scripts can check a
+public-mode push but cannot change visibility, so the safe order is:
+
+1. While the repository is still private, complete the review and run the full
+   scan with gitleaks.
+2. While it is still private, run the public-mode dry-run. This contacts GitHub
+   only because `--authorize-github` was supplied, checks history and
+   fast-forward status, and does **not** change visibility:
+
+   ```bash
+   ./tools/publish.sh check
+   ./tools/publish.sh push-github --authorize-github --visibility public \
+     --confirm-public
+   ```
+
+3. Only if those checks pass, change the GitHub repository visibility to public
+   manually.
+4. Push the already-reviewed commit with explicit public confirmation:
 
    ```bash
    ./tools/publish.sh push-github --authorize-github --visibility public \
      --execute --confirm-public
    ```
 
+Do not make a repository public before the final scan. If the repository is
+already public, repeat the scan and dry-run for every new commit, then execute
+the push; no visibility change is needed.
+
 The confirmation flags do not themselves make a repository public. Do not
-publish if the private review found unresolved data-rights, attribution,
-identity, or security questions. If the local clean history diverges from the
-GitHub repository's existing commits, do not force-push; resolve the repository
-or branch choice explicitly first.
+publish if the review found unresolved data-rights, attribution, identity, or
+security questions. If the local clean history diverges from the GitHub
+repository's existing commits, do not force-push; resolve the repository or
+branch choice explicitly first.
 
 ## Gitee mirror (explicit authorization only)
 
@@ -149,10 +172,20 @@ first, then:
 This mirrors the source `main` branch only. It does not create or update Gitee
 Releases, tags, binaries, or repository descriptions.
 
-## APK and release artifacts
+## APK and GitHub Release artifacts
 
-The publication scripts intentionally do not publish APKs. A debug-signed APK is
-not a release artifact. If binaries are published later, build them from the
-reviewed commit, sign them with a release key that is never committed, and
-publish a SHA-256 checksum next to each file. Document the signing key owner and
-rotation procedure separately.
+Source publication and binary release are separate decisions. A debug-signed
+APK is never a release artifact, and the source scripts do not upload binaries.
+
+The standard signed-release flow is in [RELEASING.md](RELEASING.md). It uses
+`tools/release.sh` to build from the reviewed commit, sign locally with a
+keystore that is never committed, verify the package and certificate, and create
+a source archive with SHA-256 checksums. Publishing a tag or GitHub Release
+requires the explicit `--authorize-github` flag in addition to `--execute`.
+
+Do not:
+- upload a debug APK or an unsigned APK;
+- overwrite an existing tag or release;
+- put the keystore, passwords, or a GitHub token in the repository;
+- make a release from a dirty worktree or a commit that is not on the public
+  source branch.
