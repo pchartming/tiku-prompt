@@ -15,6 +15,9 @@
 #   tools/publish.sh push-gitee --authorize-gitee
 #                    [--execute] [--confirm-mirror]
 #
+# push-gitee mirrors the source main branch only. Release tags and assets are
+# mirrored by tools/release.sh publish-gitee after a GitHub Release exists.
+#
 # Environment:
 #   GITLEAKS_BIN   Optional path to a gitleaks binary. Public pushes require it.
 #
