@@ -54,22 +54,6 @@
 
 单元测试是纯 JVM 测试，会校验课程数据、目标顺序、格式切换、提示词拼接和错误处理。生成的 debug APK 位于 `app/build/outputs/apk/debug/`。
 
-### 远程构建（可选）
-
-资源有限的机器可以把 Gradle 放到另一台 Linux 构建机上执行。构建机需要 JDK 17、Android SDK 和 Gradle 8.14.3；SSH 免密登录和路径通过环境变量或本地 `.env.build` 配置：
-
-```bash
-export TIKU_BUILD_SSH=user@builder
-export TIKU_BUILD_ROOT="$HOME/tiku-build"
-export TIKU_BUILD_TOOLCHAIN="$HOME/android-env"   # 内含 jdk17/ 与 android-sdk/
-export TIKU_BUILD_GRADLE_BIN="$HOME/gradle-8.14.3/bin/gradle"
-
-./tools/build_remote.sh --check
-./tools/build_remote.sh --warm --test
-```
-
-`.env.build` 已被忽略，且不会同步到构建机。该脚本只使用专用远端目录，不修改源码、不执行 Git、不使用 sudo。产物取回 `dist/`。
-
 ## 代码结构
 
 ```text
@@ -81,7 +65,6 @@ app/src/main/
   java/.../prompt/      目标 Profile 元数据、表单校正、提示词拼接
   java/.../ui/          Compose 界面与 ViewModel
 app/src/test/           纯 JVM 单元测试
-tools/                  构建、发布检查与 Release 工具
 ```
 
 添加新的答题 App 格式时，通常只需要：
@@ -89,51 +72,6 @@ tools/                  构建、发布检查与 Release 工具
 1. 在 `app/src/main/assets/prompts/` 增加格式规范，末尾保留“出题要求：”标题；
 2. 在 `TargetProfiles.kt` 注册格式元数据、支持的题型和数量/选项边界；
 3. 补充对应测试，确认切换目标时共享范围不会丢失。
-
-## 发布检查与推送
-
-维护者提交源码前运行：
-
-```bash
-./tools/publish.sh check
-```
-
-脚本会扫描已提交文件中的凭据、个人路径、私有网络地址、敏感注释和不合规文件，并检查许可证/第三方声明是否齐全。
-
-默认发布目标是私仓 `origin`，且必须显式加 `--execute` 才会推送：
-
-```bash
-./tools/publish.sh push-private
-./tools/publish.sh push-private --execute
-```
-
-GitHub 和 Gitee 不是默认目标。只有仓库所有者明确授权后，才能分别使用
-`--authorize-github` / `--authorize-gitee`；脚本不会在默认或检查流程中联系这两个远端。详细流程见 [docs/PUBLISHING.md](docs/PUBLISHING.md)。
-
-## 发布 APK 与源码
-
-正式 APK 由 `tools/release.sh` 在远程构建机生成未签名包，再在本地使用未进入公开源码的发布密钥签名。脚本会校验包名、版本、签名证书、对齐、调试标志和权限，并生成源码包与 SHA-256 校验和：
-
-```bash
-./tools/release.sh check
-./tools/release.sh build
-```
-
-产物位于 `dist/release/<tag>/`，不会进入 Git。GitHub Release 的上传是单独的显式授权步骤：
-
-```bash
-./tools/release.sh publish-github --authorize-github
-./tools/release.sh publish-github --authorize-github --execute
-```
-
-GitHub Release 发布后，可将同一 tag、源码状态和四个 Release 资产镜像到 Gitee；Gitee 不是独立发布源，已有资产不会被覆盖：
-
-```bash
-./tools/release.sh publish-gitee --authorize-gitee
-./tools/release.sh publish-gitee --authorize-gitee --execute --confirm-mirror
-```
-
-debug APK 不是发布产物。发布密钥、密码、GitHub token 和 Gitee token 不进入公开源码或发布产物；私钥备份只能放在受控的私有存储中，且不得合并到 `main` 或推送到 GitHub/Gitee。完整流程、密钥管理和失败重试见 [docs/RELEASING.md](docs/RELEASING.md)。
 
 ## 许可证
 
