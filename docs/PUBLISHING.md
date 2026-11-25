@@ -179,13 +179,15 @@ APK is never a release artifact, and the source scripts do not upload binaries.
 
 The standard signed-release flow is in [RELEASING.md](RELEASING.md). It uses
 `tools/release.sh` to build from the reviewed commit, sign locally with a
-keystore that is never committed, verify the package and certificate, and create
-a source archive with SHA-256 checksums. Publishing a tag or GitHub Release
-requires the explicit `--authorize-github` flag in addition to `--execute`.
+keystore that is never committed to the published branch, verify the package and
+certificate, and create a source archive with SHA-256 checksums. Publishing a tag
+or GitHub Release requires the explicit `--authorize-github` flag in addition to
+`--execute`.
 
 Do not:
 - upload a debug APK or an unsigned APK;
 - overwrite an existing tag or release;
-- put the keystore, passwords, or a GitHub token in the repository;
+- put the keystore, passwords, or a GitHub token in the published source or any
+  public remote;
 - make a release from a dirty worktree or a commit that is not on the public
   source branch.

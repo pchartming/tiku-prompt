@@ -19,8 +19,11 @@ GitHub Release. Nothing is published by the default action.
   `versionName` in `app/build.gradle.kts`.
 - `versionCode` must increase for every published APK.
 - Release notes are required at `docs/releases/<tag>.md`.
-- The signing keystore lives outside this repository and is never copied into
-  it. Passwords are supplied by environment or a gitignored `.env.release`.
+- The signing keystore is never committed to the published `main` branch. Keep
+  the working copy outside the repository. A backup may live only on a
+  private-only branch that is never pushed to GitHub/Gitee. Passwords are
+  supplied by environment or a gitignored `.env.release`; a private backup of
+  that file must stay on the same private-only branch.
 - The script pins the signer certificate fingerprint. A debug certificate or a
   different certificate is rejected.
 - Existing releases and tags are never overwritten. There is no force push.
@@ -50,9 +53,9 @@ keytool -genkeypair \
 ```
 
 The command prompts for the keystore and key passwords; do not put passwords on
-the command line. Back up the keystore and passwords offline. Losing the key
-means future APKs cannot update an existing installation under the same
-application ID.
+the command line. Back up the keystore and passwords in controlled private
+storage; never merge that backup into `main`. Losing the key means future APKs
+cannot update an existing installation under the same application ID.
 
 Read the certificate fingerprint; it is the value for
 `TIKU_RELEASE_CERT_SHA256`. Colons and uppercase hex are accepted.

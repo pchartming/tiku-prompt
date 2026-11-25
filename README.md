@@ -112,7 +112,7 @@ GitHub 和 Gitee 不是默认目标。只有仓库所有者明确授权后，才
 
 ## 发布 APK 与源码
 
-正式 APK 由 `tools/release.sh` 在远程构建机生成未签名包，再在本地使用仓库外的发布密钥签名。脚本会校验包名、版本、签名证书、对齐、调试标志和权限，并生成源码包与 SHA-256 校验和：
+正式 APK 由 `tools/release.sh` 在远程构建机生成未签名包，再在本地使用未进入公开源码的发布密钥签名。脚本会校验包名、版本、签名证书、对齐、调试标志和权限，并生成源码包与 SHA-256 校验和：
 
 ```bash
 ./tools/release.sh check
@@ -126,7 +126,7 @@ GitHub 和 Gitee 不是默认目标。只有仓库所有者明确授权后，才
 ./tools/release.sh publish-github --authorize-github --execute
 ```
 
-debug APK 不是发布产物。发布密钥、密码和 GitHub token 只保存在本机，不提交。完整流程、密钥管理和失败重试见 [docs/RELEASING.md](docs/RELEASING.md)。
+debug APK 不是发布产物。发布密钥、密码和 GitHub token 不进入公开源码或发布产物；私钥备份只能放在受控的私有存储中，且不得合并到 `main` 或推送到 GitHub/Gitee。完整流程、密钥管理和失败重试见 [docs/RELEASING.md](docs/RELEASING.md)。
 
 ## 许可证
 
