@@ -78,6 +78,20 @@ Gitee Release 镜像（仅在 GitHub Release 已发布且所有者明确授权�
 - `GH_TOKEN` 必须属于仓库所有者 `pchartming`；`TIKU_GITEE_TOKEN` 必须属于 Gitee 的 `pchartming` 账户，不得复用其他项目或其他账户的 token。两者都不要写入公开源码。
 - 任何脚本 dry-run 通过后，仍要检查输出再执行；不要跳过 `--authorize-github` / `--authorize-gitee` 的授权边界。
 
+## 标准 Release 流程（含 APK）
+
+发布顺序固定，不得跳过或调换：
+
+1. **准备版本**：从干净的 `main` 开始；递增 `versionCode`；在 `docs/releases/v<versionName>.md` 写版本说明；按默认规则提交并推私仓 `origin`。
+2. **远端构建与签名**：运行 `./tools/build_remote.sh --warm --test`，再运行 `./tools/release.sh check` 和 `./tools/release.sh build`。产物位于 `dist/release/<tag>/`，必须包含已签名 Release APK、源码包、`SHA256SUMS` 和 `release-info.txt`；核对包名、版本、证书、zipalign、非 debuggable、单签名者和无 `INTERNET` 权限。
+3. **所有者测试与明确授权**：所有者安装并测试 Release APK；通过后必须明确授权发布平台，例如“测试通过，授权发布到 GitHub 和 Gitee”。仅说“发布”“可以发布”不构成对 GitHub/Gitee 的授权；执行前先复核对应脚本的 dry-run。
+4. **GitHub 源码先行**：使用 `./tools/publish.sh push-github ...` 发布源码；确认 `github/main == HEAD` 后，才能创建 GitHub Release。
+5. **GitHub Release 与 APK**：使用 `./tools/release.sh publish-github --authorize-github` 创建 tag/Release，并上传签名 APK、源码包、`SHA256SUMS`、`release-info.txt`。APK 不得提交进 Git；debug 或未签名 APK 永远不得上传。
+6. **Gitee 镜像**：先执行 `./tools/publish.sh push-gitee --authorize-gitee` 镜像源码 `main`（只能在 `github/main == HEAD` 后，且只 fast-forward）；GitHub Release 发布后，再执行 `./tools/release.sh publish-gitee --authorize-gitee` 镜像 tag 和全部 Release 资产（包括 APK）。只创建缺失 tag、只上传缺失资产，SHA-256 必须一致；不得覆盖、移动或删除已有内容。
+7. **最终复核**：确认 GitHub 与 Gitee 的 `main`、tag、Release 资产及 checksums 一致；任何检查失败都停止修复。
+
+- APK 的正式发布位置是 Release 资产，不是源码仓库；只发布源码而遗漏 APK 不算完成本流程。
+
 ## 构建与部署规则
 
 - 不在本机运行 Gradle。构建统一走 `tools/build_remote.sh` 或 `tools/release.sh` 的远端构建机。
@@ -87,7 +101,7 @@ Gitee Release 镜像（仅在 GitHub Release 已发布且所有者明确授权�
 - 只从干净的 `main` 构建；`versionCode` 必须递增；版本说明必须位于 `docs/releases/v<versionName>.md`。
 - debug APK 永远不是发布产物；未签名 APK 不得上传或分发。
 - Release APK 必须验证包名、版本、签名证书、zipalign、非 debuggable、单签名者和无 `INTERNET` 权限。
-- 发布产物写入 `dist/release/<tag>/`，不进入 Git。不得把 APK、AAB、`.idsig`、`dist/` 或签名文件提交到仓库。
+- 发布产物写入 `dist/release/<tag>/`，不进入 Git。签名 APK 只作为 GitHub Release 资产上传，并由 Gitee Release 镜像；不得把 APK、AAB、`.idsig`、`dist/` 或签名文件提交到仓库。
 
 ## 密钥与敏感信息
 
