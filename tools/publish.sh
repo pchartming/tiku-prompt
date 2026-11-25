@@ -179,8 +179,8 @@ check_gitee_remote() {
     *) die "Gitee remote does not look like a Gitee URL: $url" ;;
   esac
   case "$url" in
-    *tiku-prompt*|*tiku-prompt.git*) ;;
-    *) die "Gitee remote does not point at a tiku-prompt repository: $url" ;;
+    *gitee.com:pchartming/tiku-prompt*|*gitee.com/pchartming/tiku-prompt*) ;;
+    *) die "Gitee remote is not pchartming/tiku-prompt: $url" ;;
   esac
 }
 

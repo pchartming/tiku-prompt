@@ -472,8 +472,8 @@ require_gitee_remote() {
     *) die "Gitee remote does not look like a Gitee URL: $url" ;;
   esac
   case "$url" in
-    *tiku-prompt*|*tiku-prompt.git*) ;;
-    *) die "Gitee remote does not point at a tiku-prompt repository: $url" ;;
+    *gitee.com:pchartming/tiku-prompt*|*gitee.com/pchartming/tiku-prompt*) ;;
+    *) die "Gitee remote is not pchartming/tiku-prompt: $url" ;;
   esac
 }
 
@@ -548,6 +548,8 @@ publish_gitee() {
     || die "Gitee mirroring requires explicit authorization: add --authorize-gitee"
   [ "$EXECUTE" = 0 ] || [ "$CONFIRM_MIRROR" = 1 ] \
     || die "Gitee mirroring requires --confirm-mirror"
+  [ "$EXECUTE" = 0 ] || [ -n "${TIKU_GITEE_TOKEN:-}" ] \
+    || die "TIKU_GITEE_TOKEN is required; use a Gitee token owned by pchartming"
   require_clean_main
   require_tag_not_moved
   require_mirror_tools
@@ -578,8 +580,6 @@ publish_gitee() {
     return 0
   fi
 
-  [ -n "${TIKU_GITEE_TOKEN:-}" ] \
-    || die "TIKU_GITEE_TOKEN is required; use a Gitee token owned by pchartming"
   python3 "$PROJECT_ROOT/tools/gitee_mirror.py" status \
     --tag "$TAG" --expected-commit "$(git rev-parse HEAD)" >/dev/null \
     || die "Gitee token/permission check failed"
