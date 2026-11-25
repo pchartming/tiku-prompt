@@ -18,7 +18,7 @@
 
 ## 远端与默认推送规则
 
-默认只推私有的 `origin`。`github` 仅用于 `pchartming/tiku-prompt` 的公开源码和显式授权的 GitHub Release；Gitee 未配置，且必须单独授权。
+默认只推私有的 `origin`。`github` 仅用于 `pchartming/tiku-prompt` 的公开源码和显式授权的 GitHub Release；`gitee` 已配置为 `git@gitee.com:pchartming/tiku-prompt.git`，仅镜像公开源码 `main`，且必须单独授权。
 
 - 普通提交、日常同步、文档更新：只推私仓 `origin`。
 - 用户说“发布”“push”“上线”“部署”等模糊表述，不等于授权 GitHub 或 Gitee。必须由所有者明确指定目标平台后，才能使用对应的授权参数。

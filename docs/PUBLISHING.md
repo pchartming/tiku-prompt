@@ -169,9 +169,15 @@ branch choice explicitly first.
 
 ## Gitee mirror (explicit authorization only)
 
-Gitee is an optional source mirror. Do not configure or push it until the
-repository owner explicitly authorizes the mirror. Configure the `gitee` remote
-first, then:
+Gitee is an optional source mirror. The configured remote is
+`git@gitee.com:pchartming/tiku-prompt.git`; the public repository uses `main` as
+its default and only branch. Pushing still requires explicit authorization:
+
+```bash
+git remote add gitee git@gitee.com:pchartming/tiku-prompt.git  # one-time setup
+```
+
+Then run:
 
 ```bash
 ./tools/publish.sh push-gitee --authorize-gitee
