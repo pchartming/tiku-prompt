@@ -8,6 +8,12 @@ enum class DifficultyStyle {
     CONTENT_ONLY,
 }
 
+enum class ExportKind {
+    NONE,
+    STUDY_LOCK_ZIP,
+    HALO_TV_JSON,
+}
+
 data class ProfileHelp(
     val summary: String,
     val notes: List<String>,
@@ -36,7 +42,10 @@ data class PromptProfile(
     val difficultyStyle: DifficultyStyle,
     val help: ProfileHelp,
     val emitTypeIds: Boolean = true,
+    val exportKind: ExportKind = ExportKind.NONE,
     val exportHint: String = "",
+    val lanUrlHint: String = "",
+    val lanUrlPlaceholder: String = "",
     val spec: String = "",
 ) {
     fun supports(type: QuestionType): Boolean = type in supportedTypes
@@ -69,6 +78,8 @@ object TargetProfiles {
                 "单次最多导入 200 题；答案下标从 0 开始。",
             ),
         ),
+        lanUrlHint = "在电视打开“家长中心”的局域网页面，按二维码或页面显示的完整地址填写；地址通常包含端口和配对码，以电视显示为准。",
+        lanUrlPlaceholder = "http://192.168.x.x:<端口>/<路径>?<配对码>",
     )
 
     val studyontv = PromptProfile(
@@ -102,6 +113,8 @@ object TargetProfiles {
                 "本工具不生成图片题或音频题，也不会调用任何网络服务。",
             ),
         ),
+        lanUrlHint = "在电视打开家长控制页，地址通常为 http://电视IP:8099/；打开后按电视端设置输入家长密码。",
+        lanUrlPlaceholder = "http://192.168.x.x:8099/",
     )
 
     val studylock = PromptProfile(
@@ -129,17 +142,59 @@ object TargetProfiles {
                 "本工具不生成 ps/po/pe 拼音字段；学习锁是第三方闭源软件，这里只提供非官方格式兼容。",
             ),
             importSteps = listOf(
-                "把 AI 返回的内容保存为 .json 文件（UTF-8 无 BOM），不要保留 Markdown 代码围栏。",
-                "直接压缩这个 .json 文件为 zip，不要把 JSON 再套一层文件夹；一个 zip 可放多个 JSON。",
+                "在应用内把 AI 返回的 JSON 粘贴到“AI 结果 → 学习锁 zip”，可连续添加多个题库后一次生成 zip。",
+                "没有使用应用内打包时，也可以把 JSON 保存为 UTF-8 无 BOM 的 .json，直接压缩为 zip，不要套文件夹。",
                 "打开学习锁局域网家长控制端 → 题库 → 上传 zip；或把 zip 放到电视“下载”目录，在题库管理中选择导入本机 zip。",
-                "不写 index.json 也能导入；包名取文件名，导入后自动加 my_ 前缀。",
+                "应用生成的 zip 会附带 index.json 和每题库一个 JSON；导入后题库名称取 index.json 的 title。",
             ),
         ),
         emitTypeIds = false,
-        exportHint = "保存为 UTF-8 无 BOM 的 .json，直接压成 zip 后在学习锁电视控制端题库页上传；不写 index.json 也能导入。",
+        exportKind = ExportKind.STUDY_LOCK_ZIP,
+        exportHint = "",
+        lanUrlHint = "在电视打开“局域网家长控制”，使用电视显示的完整地址；?t= 后是 8 位验证码，失效后重新复制并修改保存。",
+        lanUrlPlaceholder = "http://192.168.x.x:8765/?t=12345678",
     )
 
-    val definitions: List<PromptProfile> = listOf(studyontv, planyourtv, studylock)
+    val halotv = PromptProfile(
+        id = "halotv",
+        name = "HaloTV",
+        formatBadge = "3.6+",
+        tagline = "家长出题 · 2–4 选一",
+        specAssetName = "halotv_v1.txt",
+        supportedTypes = listOf(QuestionType.SINGLE),
+        defaultTypes = setOf(QuestionType.SINGLE),
+        countChoices = listOf(10, 20, 30, 50, 80),
+        defaultCount = 20,
+        maxCount = 80,
+        optionChoices = listOf(2, 3, 4),
+        defaultOptions = 4,
+        maxOptions = 4,
+        difficultyStyle = DifficultyStyle.CONTENT_ONLY,
+        help = ProfileHelp(
+            summary = "输出 HaloTV 3.6+ 家长出题可导入的 JSON：根对象为 format 和 bank，只支持 2–4 选一单选题。",
+            notes = listOf(
+                "题干 1–56 个字符，选项 1–18 个字符；不要换行、控制字符或 emoji。",
+                "每题 2–4 个选项，选项互不重复；题库名 1–20 个字符，同一台电视上不能重名。提示词默认写“AI 出题”，导入第二套前请修改 bank.name。",
+                "只写 prompt、options、answer；answer 是 0 起始下标，只能有一个正确项。",
+                "不要写 explanation、difficulty、type、id、version、items 等字段；HaloTV 没有解析或难度字段。",
+                "单题库最多 80 题；所有题库合计最多 6 个、80 题；每局抽 5 题，不足 5 题时用内置题库补齐。",
+                "文件保存为 UTF-8 无 BOM、不超过 256 KB；应用会在本机先校验格式，导入后仍请人工核对答案。",
+            ),
+            importSteps = listOf(
+                "把 AI 返回的 JSON 粘贴到“AI 结果 → HaloTV 题库”，校验通过后导出 .json 文件。",
+                "手机与电视连接同一局域网，打开 HaloTV 手机管理页 → 儿童与长辈 → 家长出题，按提示验证 PIN。",
+                "选择“导入题库”，选中刚导出的 JSON 文件；每次导入会新建题库，不会追加到已有题库。",
+                "在答题设置中选择该题库；每局 5 题，题库不足 5 题时会用内置题补齐。",
+            ),
+        ),
+        emitTypeIds = false,
+        exportKind = ExportKind.HALO_TV_JSON,
+        exportHint = "",
+        lanUrlHint = "在电视的“手机管理中心”按显示的地址或二维码进入；不同版本端口可能不同，以电视显示为准。",
+        lanUrlPlaceholder = "http://192.168.x.x:<端口>/",
+    )
+
+    val definitions: List<PromptProfile> = listOf(studyontv, planyourtv, studylock, halotv)
 
     val default: PromptProfile get() = definitions.first()
 

@@ -57,11 +57,35 @@ class AppRepository(context: Context) {
         prefs.edit().putString(KEY_FORM, raw).apply()
     }
 
+    fun loadLanUrls(profileIds: Collection<String>): Map<String, String> =
+        profileIds.mapNotNull { id ->
+            prefs.getString(lanUrlKey(id), null)
+                ?.takeIf { it.isNotBlank() }
+                ?.let { url -> id to url }
+        }.toMap()
+
+    fun saveLanUrl(profileId: String, url: String) {
+        val editor = prefs.edit()
+        if (url.isBlank()) {
+            editor.remove(lanUrlKey(profileId))
+        } else {
+            editor.putString(lanUrlKey(profileId), url)
+        }
+        editor.apply()
+    }
+
+    fun clearLanUrl(profileId: String) {
+        saveLanUrl(profileId, "")
+    }
+
     private fun readAsset(path: String): String =
         assets.open(path).bufferedReader(StandardCharsets.UTF_8).use { it.readText() }
+
+    private fun lanUrlKey(profileId: String): String = "$KEY_LAN_URL_PREFIX$profileId"
 
     private companion object {
         const val PREFS_NAME = "tiku_prompt"
         const val KEY_FORM = "form_v1"
+        const val KEY_LAN_URL_PREFIX = "lan_url_v1_"
     }
 }

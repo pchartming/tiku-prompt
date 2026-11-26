@@ -66,6 +66,13 @@ changes.
 and prompt document a publicly observable JSON import shape. Compatibility is
 unofficial and may change without notice.
 
+## HaloTV
+
+HaloTV is a third-party open-source application. The import-format description
+in this repository is based on its publicly available parent-quiz format. No
+HaloTV source code, assets, or question banks are bundled. Compatibility is
+unofficial and may change when HaloTV changes.
+
 ## Build and runtime dependencies
 
 These libraries are resolved by Gradle and are not vendored source in this
@@ -86,6 +93,6 @@ The Android SDK and build tools are not redistributed by this repository.
 ## Trademarks
 
 Android, Google Play, Kotlin, Jetpack, and related marks are trademarks of their
-respective owners. PlanYourTV, StudyOnTV / 题了个题, and 学习锁 are third-party
-project or product names used descriptively to identify compatible formats and
-data provenance.
+respective owners. PlanYourTV, StudyOnTV / 题了个题, 学习锁, and HaloTV are
+third-party project or product names used descriptively to identify compatible
+formats and data provenance.

@@ -43,7 +43,7 @@ fun ScopeSection(
 
     SectionBlock(
         title = "出题范围",
-        subtitle = "课程目录含单元和课时名称；需要精确到教材原文时，请在下方粘贴补充资料。",
+        subtitle = "课程目录含单元和课时名称；需要补充教材原文或额外约束时，生成后直接修改提示词。",
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),

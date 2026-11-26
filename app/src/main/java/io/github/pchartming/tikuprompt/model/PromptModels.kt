@@ -50,7 +50,7 @@ enum class OutputLanguage(
 @Serializable
 data class PromptForm(
     val targetId: String = "planyourtv",
-    val grade: Int = 4,
+    val grade: Int = 1,
     val semester: Int = 1,
     val subjectId: String = "MATH",
     val bookKey: String = "",
@@ -62,8 +62,6 @@ data class PromptForm(
     val difficulty: DifficultyIntent = DifficultyIntent.AUTO,
     val optionsPerQuestion: Int = 4,
     val outputLanguage: OutputLanguage = OutputLanguage.ZH,
-    val extraRequirement: String = "",
-    val referenceNotes: String = "",
 )
 
 data class GradeInfo(

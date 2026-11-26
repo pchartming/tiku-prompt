@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -30,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import io.github.pchartming.tikuprompt.R
+import io.github.pchartming.tikuprompt.prompt.ExportKind
 import io.github.pchartming.tikuprompt.prompt.PromptProfile
 import io.github.pchartming.tikuprompt.ui.PromptCallbacks
 
@@ -41,6 +43,7 @@ fun PromptSection(
     isModified: Boolean,
     errors: List<String>,
     callbacks: PromptCallbacks,
+    extraContent: (@Composable () -> Unit)? = null,
 ) {
     SectionBlock(
         title = "生成提示词",
@@ -127,6 +130,11 @@ fun PromptSection(
                 Text("复制提示词")
             }
 
+            if (extraContent != null) {
+                HorizontalDivider()
+                extraContent()
+            }
+
             if (profile.exportHint.isNotBlank()) {
                 HintNote(profile.exportHint)
             }
@@ -176,10 +184,18 @@ fun PromptSection(
                 }
             }
             HintNote(
-                if (isModified) {
-                    "手动修改只作用于当前提示词；更改上方任一设置都会重新自动生成。"
-                } else {
-                    "复制后粘贴到任意 AI 对话。模型返回 JSON 后，请在目标 App 中导入并核对题目与答案。"
+                when {
+                    isModified ->
+                        "手动修改只作用于当前提示词；更改上方任一设置都会重新自动生成。"
+
+                    profile.exportKind == ExportKind.STUDY_LOCK_ZIP ->
+                        "模型返回 JSON 后，粘贴到上方生成 zip；导入学习锁后请核对题目与答案。"
+
+                    profile.exportKind == ExportKind.HALO_TV_JSON ->
+                        "模型返回 JSON 后，粘贴到上方校验并导出 HaloTV 题库文件；导入后请核对题目与答案。"
+
+                    else ->
+                        "复制后粘贴到任意 AI 对话。模型返回 JSON 后，请在目标 App 中导入并核对题目与答案。"
                 },
             )
         }
@@ -197,7 +213,7 @@ private fun PromptPreview(prompt: String) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 330.dp)
+                .heightIn(max = 160.dp)
                 .verticalScroll(rememberScrollState())
                 .padding(12.dp),
         ) {

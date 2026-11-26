@@ -130,16 +130,6 @@ object PromptCompiler {
             lines += "每题选项数：${form.optionsPerQuestion} 个"
         }
         lines += "输出语言：${languageText(form.outputLanguage)}"
-        lines += "额外要求：${form.extraRequirement.trim().ifBlank { "无" }}"
-
-        val notes = form.referenceNotes.trim()
-        if (notes.isNotEmpty()) {
-            lines += ""
-            lines += "补充资料（用户提供，用于保证题目内容准确；以下面资料为事实依据，不要编造资料里没有的内容，也不要逐字照抄）："
-            lines += "【补充资料开始】"
-            lines += notes
-            lines += "【补充资料结束】"
-        }
         return lines.joinToString("\n")
     }
 

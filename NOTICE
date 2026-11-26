@@ -4,8 +4,8 @@ Copyright (c) 2026 pchartming
 Tiku Prompt is an offline prompt-generation tool. It assembles text prompts
 locally and does not call an AI service, require an API key, or request network
 access. It supports unofficial import compatibility with StudyOnTV / 题了个题,
-PlanYourTV, and 学习锁; those names describe compatible import formats and data
-provenance.
+PlanYourTV, 学习锁, and HaloTV; those names describe compatible import formats
+and data provenance.
 
 The bundled course catalog is derived from PlanYourTV's textbook catalog asset,
 which is licensed under the MIT License:
@@ -21,9 +21,9 @@ Education Platform (国家中小学智慧教育平台, https://basic.smartedu.cn
 PlanYourTV's source code is also available under the MIT License. Any reused
 PlanYourTV code must retain the same copyright and permission notice.
 
-StudyOnTV / 题了个题 and 学习锁 are third-party applications. Their names
-identify compatible import formats; compatibility is unofficial and may break
-when those apps change.
+StudyOnTV / 题了个题, 学习锁, and HaloTV are third-party applications. Their
+names identify compatible import formats; compatibility is unofficial and may
+break when those apps change.
 
 Third-party dependencies and the full PlanYourTV MIT notice are listed in
 THIRD-PARTY-NOTICES.md. The project's own source is licensed under the MIT

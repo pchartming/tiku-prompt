@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import io.github.pchartming.tikuprompt.prompt.DifficultyStyle
+import io.github.pchartming.tikuprompt.prompt.ExportKind
 import io.github.pchartming.tikuprompt.prompt.PromptProfile
 
 @Composable
@@ -123,6 +124,11 @@ fun ProfileHelpDialog(
                                 "本工具提供 ${profile.countChoices.joinToString(" / ")} 道预设；格式上限 ${profile.maxCount} 题。",
                             )
                         }
+                        if (profile.lanUrlHint.isNotBlank()) {
+                            item {
+                                HelpInfo("局域网家长端", profile.lanUrlHint)
+                            }
+                        }
                         item {
                             Text(
                                 text = "格式要点",
@@ -169,7 +175,16 @@ fun ProfileHelpDialog(
                         }
                         item {
                             HintNote(
-                                text = "本工具只在本机拼接提示词，不调用模型、不联网，也不会校验模型返回的 JSON。复制后请自行核对题目与答案。",
+                                text = when (profile.exportKind) {
+                                    ExportKind.STUDY_LOCK_ZIP ->
+                                        "本工具只在本机拼接提示词和打包 JSON，不调用模型、不联网。学习锁的 AI 结果会在本机校验后再写入 zip，但题目准确性仍请人工核对。"
+
+                                    ExportKind.HALO_TV_JSON ->
+                                        "本工具只在本机拼接提示词，并按 HaloTV 格式校验、导出 JSON；不调用模型、不联网。题目准确性仍请人工核对。"
+
+                                    else ->
+                                        "本工具只在本机拼接提示词，不调用模型、不联网，也不会校验模型返回的 JSON。复制后请自行核对题目与答案。"
+                                },
                             )
                         }
                         item {

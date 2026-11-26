@@ -4,6 +4,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,7 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,13 +47,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import io.github.pchartming.tikuprompt.ui.components.NotesSection
+import io.github.pchartming.tikuprompt.export.HaloTvQuizExporter
+import io.github.pchartming.tikuprompt.export.HaloTvQuizFile
+import io.github.pchartming.tikuprompt.export.StudyLockZipExporter
+import io.github.pchartming.tikuprompt.lan.LanAddress
+import io.github.pchartming.tikuprompt.prompt.ExportKind
+import io.github.pchartming.tikuprompt.ui.components.AboutDialog
+import io.github.pchartming.tikuprompt.ui.components.HaloTvExportSection
+import io.github.pchartming.tikuprompt.ui.components.LanAccessSection
+import io.github.pchartming.tikuprompt.ui.components.MoreSheet
 import io.github.pchartming.tikuprompt.ui.components.ProfileHelpDialog
 import io.github.pchartming.tikuprompt.ui.components.PromptSection
 import io.github.pchartming.tikuprompt.ui.components.ScopeSection
 import io.github.pchartming.tikuprompt.ui.components.SettingsSection
+import io.github.pchartming.tikuprompt.ui.components.StudyLockExportSection
 import io.github.pchartming.tikuprompt.ui.components.TargetSection
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,9 +78,201 @@ fun TikuScreen(viewModel: TikuViewModel) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var showHelp by rememberSaveable { mutableStateOf(false) }
+    var showMore by rememberSaveable { mutableStateOf(false) }
+    var showAbout by rememberSaveable { mutableStateOf(false) }
+    var pendingZip by remember { mutableStateOf<StudyLockExportFile?>(null) }
+    var pendingJsonDraftKey by remember { mutableStateOf<Long?>(null) }
+    var pendingHaloTvFile by remember { mutableStateOf<HaloTvQuizFile?>(null) }
 
     val profile = state.selectedProfile
     val catalog = state.catalog
+
+    val createZipLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        val file = pendingZip
+        pendingZip = null
+        if (uri == null) {
+            scope.launch { snackbarHostState.showSnackbar("已取消保存") }
+        } else if (file != null) {
+            scope.launch {
+                val success = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openOutputStream(uri)?.use { output ->
+                            output.write(file.bytes)
+                        } ?: error("无法打开输出文件")
+                    }.isSuccess
+                }
+                snackbarHostState.showSnackbar(
+                    if (success) {
+                        "学习锁 zip 已保存（${file.packCount} 个题库，${file.questionCount} 道题）"
+                    } else {
+                        "保存失败，请重试"
+                    },
+                )
+            }
+        }
+    }
+
+    val openJsonLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        val key = pendingJsonDraftKey
+        pendingJsonDraftKey = null
+        if (uri != null && key != null) {
+            scope.launch {
+                val text = withContext(Dispatchers.IO) {
+                    readTextLimited(context, uri, StudyLockZipExporter.MAX_JSON_BYTES)
+                }
+                if (text == null) {
+                    snackbarHostState.showSnackbar("文件读取失败，或超过 8 MB")
+                } else {
+                    viewModel.updateStudyLockJson(key, text)
+                }
+            }
+        }
+    }
+
+    val createHaloTvLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        val file = pendingHaloTvFile
+        pendingHaloTvFile = null
+        if (uri == null) {
+            scope.launch { snackbarHostState.showSnackbar("已取消保存") }
+        } else if (file != null) {
+            scope.launch {
+                val success = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openOutputStream(uri)?.use { output ->
+                            output.write(file.bytes)
+                        } ?: error("无法打开输出文件")
+                    }.isSuccess
+                }
+                snackbarHostState.showSnackbar(
+                    if (success) {
+                        "HaloTV 题库已保存（${file.questionCount} 道题）"
+                    } else {
+                        "保存失败，请重试"
+                    },
+                )
+            }
+        }
+    }
+
+    val openHaloTvLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val text = withContext(Dispatchers.IO) {
+                    readTextLimited(context, uri, HaloTvQuizExporter.MAX_JSON_BYTES)
+                }
+                if (text == null) {
+                    snackbarHostState.showSnackbar("文件读取失败，或超过 256 KB")
+                } else {
+                    viewModel.updateHaloTvJson(text)
+                }
+            }
+        }
+    }
+
+    fun pasteStudyLockJson(key: Long) {
+        val text = clipboard.primaryClip
+            ?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)
+            ?.coerceToText(context)
+            ?.toString()
+        if (text.isNullOrBlank()) {
+            scope.launch { snackbarHostState.showSnackbar("剪贴板里没有文本") }
+        } else {
+            viewModel.updateStudyLockJson(key, text)
+        }
+    }
+
+    fun pickStudyLockJson(key: Long) {
+        pendingJsonDraftKey = key
+        openJsonLauncher.launch(
+            arrayOf("application/json", "text/plain", "application/octet-stream"),
+        )
+    }
+
+    fun pasteHaloTvJson() {
+        val text = clipboard.primaryClip
+            ?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)
+            ?.coerceToText(context)
+            ?.toString()
+        if (text.isNullOrBlank()) {
+            scope.launch { snackbarHostState.showSnackbar("剪贴板里没有文本") }
+        } else {
+            viewModel.updateHaloTvJson(text)
+        }
+    }
+
+    fun pickHaloTvJson() {
+        openHaloTvLauncher.launch(
+            arrayOf("application/json", "text/plain", "application/octet-stream"),
+        )
+    }
+
+    fun readLanClipboard(): String? {
+        val text = clipboard.primaryClip
+            ?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)
+            ?.coerceToText(context)
+            ?.toString()
+            ?.trim()
+        if (text.isNullOrEmpty()) {
+            scope.launch { snackbarHostState.showSnackbar("剪贴板里没有文本") }
+            return null
+        }
+        return text
+    }
+
+    fun openLanUrl(raw: String) {
+        val result = LanAddress.normalize(raw)
+        if (!result.isValid) {
+            scope.launch {
+                snackbarHostState.showSnackbar(result.error ?: "地址格式不正确")
+            }
+            return
+        }
+        val view = Intent(Intent.ACTION_VIEW, Uri.parse(result.normalizedUrl))
+        runCatching {
+            context.startActivity(view)
+        }.onFailure {
+            scope.launch {
+                snackbarHostState.showSnackbar("没有找到可打开网页的应用")
+            }
+        }
+    }
+
+    val studyLockCallbacks = StudyLockCallbacks(
+        onAdd = viewModel::addStudyLockDraft,
+        onSelect = viewModel::selectStudyLockDraft,
+        onJsonChange = viewModel::updateStudyLockJson,
+        onTitleChange = viewModel::updateStudyLockTitle,
+        onClear = viewModel::clearStudyLockJson,
+        onRemove = viewModel::removeStudyLockDraft,
+        onPaste = { key -> pasteStudyLockJson(key) },
+        onPickFile = { key -> pickStudyLockJson(key) },
+        onExport = { file ->
+            pendingZip = file
+            createZipLauncher.launch(file.suggestedName)
+        },
+    )
+
+    val haloTvCallbacks = HaloTvCallbacks(
+        onJsonChange = viewModel::updateHaloTvJson,
+        onClear = viewModel::clearHaloTvJson,
+        onPaste = { pasteHaloTvJson() },
+        onPickFile = { pickHaloTvJson() },
+        onExport = { file ->
+            pendingHaloTvFile = file
+            createHaloTvLauncher.launch(file.suggestedName)
+        },
+    )
 
     fun copyPrompt() {
         val value = state.prompt
@@ -102,8 +309,6 @@ fun TikuScreen(viewModel: TikuViewModel) {
         onDifficulty = viewModel::setDifficulty,
         onOptions = viewModel::setOptions,
         onLanguage = viewModel::setOutputLanguage,
-        onExtraRequirement = viewModel::setExtraRequirement,
-        onReferenceNotes = viewModel::setReferenceNotes,
     )
     val promptCallbacks = PromptCallbacks(
         onBeginEdit = viewModel::beginEditPrompt,
@@ -133,13 +338,10 @@ fun TikuScreen(viewModel: TikuViewModel) {
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = { showHelp = true },
-                        enabled = profile != null,
-                    ) {
+                    IconButton(onClick = { showMore = true }) {
                         Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "格式说明",
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "更多",
                         )
                     }
                 },
@@ -190,6 +392,15 @@ fun TikuScreen(viewModel: TikuViewModel) {
                     )
                 }
                 item {
+                    LanAccessSection(
+                        profile = profile,
+                        savedUrl = state.lanUrl,
+                        onSave = { value -> viewModel.saveLanUrl(profile.id, value) },
+                        onPaste = { readLanClipboard() },
+                        onOpen = { url -> openLanUrl(url) },
+                    )
+                }
+                item {
                     ScopeSection(
                         catalog = catalog,
                         form = state.form,
@@ -204,12 +415,6 @@ fun TikuScreen(viewModel: TikuViewModel) {
                     )
                 }
                 item {
-                    NotesSection(
-                        form = state.form,
-                        callbacks = formCallbacks,
-                    )
-                }
-                item {
                     PromptSection(
                         profile = profile,
                         prompt = state.prompt,
@@ -217,6 +422,25 @@ fun TikuScreen(viewModel: TikuViewModel) {
                         isModified = state.isPromptModified,
                         errors = state.validationErrors,
                         callbacks = promptCallbacks,
+                        extraContent = if (profile.exportKind == ExportKind.STUDY_LOCK_ZIP) {
+                            {
+                                StudyLockExportSection(
+                                    drafts = state.studyLockExport.drafts,
+                                    selectedKey = state.studyLockExport.selectedKey,
+                                    catalog = catalog,
+                                    callbacks = studyLockCallbacks,
+                                )
+                            }
+                        } else if (profile.exportKind == ExportKind.HALO_TV_JSON) {
+                            {
+                                HaloTvExportSection(
+                                    json = state.haloTvJson,
+                                    callbacks = haloTvCallbacks,
+                                )
+                            }
+                        } else {
+                            null
+                        },
                     )
                 }
                 item {
@@ -242,11 +466,55 @@ fun TikuScreen(viewModel: TikuViewModel) {
         }
     }
 
+    if (showMore) {
+        MoreSheet(
+            profile = profile,
+            onDismiss = { showMore = false },
+            onShowHelp = {
+                showMore = false
+                showHelp = true
+            },
+            onShowAbout = {
+                showMore = false
+                showAbout = true
+            },
+        )
+    }
+
     if (showHelp && profile != null) {
         ProfileHelpDialog(
             profile = profile,
             onDismiss = { showHelp = false },
         )
+    }
+
+    if (showAbout) {
+        AboutDialog(onDismiss = { showAbout = false })
+    }
+}
+
+private fun readTextLimited(context: Context, uri: Uri, maxBytes: Int): String? {
+    return try {
+        val stream = context.contentResolver.openInputStream(uri) ?: return null
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(16 * 1024)
+        var total = 0
+        var overLimit = false
+        stream.use { input ->
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                total += read
+                if (total > maxBytes) {
+                    overLimit = true
+                    break
+                }
+                output.write(buffer, 0, read)
+            }
+        }
+        if (overLimit) null else output.toByteArray().toString(Charsets.UTF_8)
+    } catch (_: Exception) {
+        null
     }
 }
 

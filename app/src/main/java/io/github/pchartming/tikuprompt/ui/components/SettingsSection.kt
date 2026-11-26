@@ -1,14 +1,6 @@
 package io.github.pchartming.tikuprompt.ui.components
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import io.github.pchartming.tikuprompt.model.DifficultyIntent
 import io.github.pchartming.tikuprompt.model.OutputLanguage
 import io.github.pchartming.tikuprompt.model.PromptForm
@@ -125,50 +117,5 @@ fun SettingsSection(
             },
         )
         HintNote("输出语言只影响题干和解析等正文；JSON 字段名与格式规则不变。")
-    }
-}
-
-@Composable
-fun NotesSection(
-    form: PromptForm,
-    callbacks: FormCallbacks,
-) {
-    SectionBlock(
-        title = "补充要求与资料",
-        subtitle = "可选。资料越贴近课堂，生成的题目越准确。",
-    ) {
-        OutlinedTextField(
-            value = form.extraRequirement,
-            onValueChange = callbacks.onExtraRequirement,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("额外要求") },
-            placeholder = {
-                Text("如：只考计算题、重点覆盖易错点、不要出应用题…")
-            },
-            minLines = 2,
-            maxLines = 4,
-            shape = MaterialTheme.shapes.medium,
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            OutlinedTextField(
-                value = form.referenceNotes,
-                onValueChange = callbacks.onReferenceNotes,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("补充资料（教材摘录 / 知识点 / 课堂笔记）") },
-                placeholder = {
-                    Text(
-                        "粘贴本课原文、公式、单词表或老师强调的知识点。留空则由模型按教材常识出题。",
-                    )
-                },
-                minLines = 4,
-                maxLines = 8,
-                shape = MaterialTheme.shapes.medium,
-            )
-            Text(
-                text = "补充资料会原样加入提示词，只在本机处理，不会上传。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }

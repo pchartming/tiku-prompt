@@ -18,8 +18,6 @@ class FormCallbacks(
     val onDifficulty: (DifficultyIntent) -> Unit,
     val onOptions: (Int) -> Unit,
     val onLanguage: (OutputLanguage) -> Unit,
-    val onExtraRequirement: (String) -> Unit,
-    val onReferenceNotes: (String) -> Unit,
 )
 
 class PromptCallbacks(

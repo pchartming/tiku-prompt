@@ -3,12 +3,14 @@ package io.github.pchartming.tikuprompt
 import io.github.pchartming.tikuprompt.data.CourseCatalog
 import io.github.pchartming.tikuprompt.data.CurriculumDto
 import io.github.pchartming.tikuprompt.data.UnitCatalogDto
+import io.github.pchartming.tikuprompt.export.StudyLockPackMetadata
 import io.github.pchartming.tikuprompt.model.DifficultyIntent
 import io.github.pchartming.tikuprompt.model.OutputLanguage
 import io.github.pchartming.tikuprompt.model.PromptForm
 import io.github.pchartming.tikuprompt.model.QuestionType
 import io.github.pchartming.tikuprompt.model.ScopeMode
 import io.github.pchartming.tikuprompt.prompt.DifficultyStyle
+import io.github.pchartming.tikuprompt.prompt.ExportKind
 import io.github.pchartming.tikuprompt.prompt.FormPlanner
 import io.github.pchartming.tikuprompt.prompt.PromptCompiler
 import io.github.pchartming.tikuprompt.prompt.PromptProfile
@@ -63,6 +65,7 @@ private fun profile(id: String): PromptProfile =
 private val plan: PromptProfile get() = profile("planyourtv")
 private val study: PromptProfile get() = profile("studyontv")
 private val studylock: PromptProfile get() = profile("studylock")
+private val halotv: PromptProfile get() = profile("halotv")
 
 class PromptPipelineTest {
 
@@ -79,9 +82,9 @@ class PromptPipelineTest {
         )
         assertEquals(9, testCatalog.grades.size)
 
-        assertEquals(3, testProfiles.size)
+        assertEquals(4, testProfiles.size)
         assertEquals(
-            listOf("studyontv", "planyourtv", "studylock"),
+            listOf("studyontv", "planyourtv", "studylock", "halotv"),
             testProfiles.map { it.id },
         )
         testProfiles.forEach { target ->
@@ -97,9 +100,39 @@ class PromptPipelineTest {
         assertEquals(4, studylock.fixedOptionCount)
         assertEquals(5000, studylock.maxCount)
         assertFalse(studylock.emitTypeIds)
+        assertEquals(ExportKind.STUDY_LOCK_ZIP, studylock.exportKind)
         assertEquals(DifficultyStyle.CONTENT_ONLY, studylock.difficultyStyle)
         assertTrue(studylock.spec.contains("{\"items\""))
         assertTrue(studylock.help.importSteps.isNotEmpty())
+
+        assertEquals(listOf(QuestionType.SINGLE), halotv.supportedTypes)
+        assertEquals(listOf(10, 20, 30, 50, 80), halotv.countChoices)
+        assertEquals(20, halotv.defaultCount)
+        assertEquals(80, halotv.maxCount)
+        assertEquals(listOf(2, 3, 4), halotv.optionChoices)
+        assertEquals(4, halotv.defaultOptions)
+        assertEquals(4, halotv.maxOptions)
+        assertFalse(halotv.emitTypeIds)
+        assertEquals(ExportKind.HALO_TV_JSON, halotv.exportKind)
+        assertEquals(DifficultyStyle.CONTENT_ONLY, halotv.difficultyStyle)
+        assertTrue(halotv.spec.contains("halotv-parent-quiz-v1"))
+        assertTrue(halotv.spec.contains("56"))
+        assertTrue(halotv.spec.contains("18"))
+        assertTrue(halotv.help.importSteps.isNotEmpty())
+    }
+
+    @Test
+    fun `every target provides a lan parent address hint`() {
+        testProfiles.forEach { target ->
+            assertTrue(target.id, target.lanUrlHint.isNotBlank())
+            assertTrue(target.id, target.lanUrlPlaceholder.startsWith("http://"))
+        }
+        assertTrue(study.lanUrlHint.contains("8099"))
+        assertTrue(study.lanUrlPlaceholder.contains(":8099/"))
+        assertTrue(studylock.lanUrlHint.contains("验证码"))
+        assertTrue(studylock.lanUrlPlaceholder.contains(":8765/"))
+        assertFalse(plan.lanUrlPlaceholder.contains(":8099/"))
+        assertFalse(halotv.lanUrlPlaceholder.contains(":8099/"))
     }
 
     @Test
@@ -111,6 +144,14 @@ class PromptPipelineTest {
         )
 
         assertEquals(plan.id, form.targetId)
+        assertEquals(1, form.grade)
+        assertEquals(1, form.semester)
+        assertEquals("MATH", form.subjectId)
+        assertEquals("1|MATH|RENJIAO|上册|新教材", form.bookKey)
+        assertEquals(ScopeMode.UNIT, form.scopeMode)
+        assertEquals(1, form.unitNo)
+        assertNull(form.lessonIndex)
+        assertEquals("数学游戏", testCatalog.findBook(form.bookKey)?.units?.first()?.title)
         assertEquals(QuestionType.SINGLE, form.questionTypes.single())
         assertEquals(20, form.count)
         assertTrue(form.bookKey.isNotBlank())
@@ -129,7 +170,8 @@ class PromptPipelineTest {
         assertTrue(prompt.contains("题量：20 道"))
         assertTrue(prompt.contains("每题选项数：4 个"))
         assertTrue(prompt.contains("输出语言：中文（简体）"))
-        assertTrue(prompt.contains("额外要求：无"))
+        assertFalse(prompt.contains("额外要求"))
+        assertFalse(prompt.contains("补充资料"))
     }
 
     @Test
@@ -181,10 +223,18 @@ class PromptPipelineTest {
         assertEquals(setOf(QuestionType.SINGLE), toStudyLock.questionTypes)
         assertEquals(4, toStudyLock.optionsPerQuestion)
         assertEquals(planForm.bookKey, toStudyLock.bookKey)
+
+        val toHaloTv = FormPlanner.changeTarget(studyForm, halotv, testCatalog)
+        assertEquals(halotv.id, toHaloTv.targetId)
+        assertEquals(ScopeMode.FINAL, toHaloTv.scopeMode)
+        assertEquals(50, toHaloTv.count)
+        assertEquals(setOf(QuestionType.SINGLE), toHaloTv.questionTypes)
+        assertEquals(4, toHaloTv.optionsPerQuestion)
+        assertEquals(planForm.bookKey, toHaloTv.bookKey)
     }
 
     @Test
-    fun `StudyOnTV form carries all selected types notes and difficulty`() {
+    fun `StudyOnTV form carries all selected types and difficulty`() {
         val types = setOf(
             QuestionType.SINGLE,
             QuestionType.MULTIPLE,
@@ -199,8 +249,6 @@ class PromptPipelineTest {
                 count = 10,
                 difficulty = DifficultyIntent.AUTO,
                 optionsPerQuestion = 6,
-                extraRequirement = "只考本学期学过的内容",
-                referenceNotes = "三角形内角和是 180 度。",
             ),
             study,
             testCatalog,
@@ -215,10 +263,6 @@ class PromptPipelineTest {
         assertTrue(prompt.contains("题型：单选（single）、多选（multiple）、判断（boolean）、填空（text）、主观（subjective）；题量允许时每种题型至少 1 道"))
         assertTrue(prompt.contains("难度：由你按题目实际难度判断（difficulty 使用 1–5 的整数）"))
         assertTrue(prompt.contains("每题选项数：6 个"))
-        assertTrue(prompt.contains("额外要求：只考本学期学过的内容"))
-        assertTrue(prompt.contains("【补充资料开始】"))
-        assertTrue(prompt.contains("三角形内角和是 180 度。"))
-        assertTrue(prompt.contains("【补充资料结束】"))
     }
 
     @Test
@@ -236,7 +280,6 @@ class PromptPipelineTest {
                 count = 30,
                 difficulty = DifficultyIntent.HARD,
                 optionsPerQuestion = 6,
-                extraRequirement = "只考本单元",
             ),
             studylock,
             testCatalog,
@@ -244,6 +287,12 @@ class PromptPipelineTest {
 
         assertEquals(setOf(QuestionType.SINGLE), form.questionTypes)
         assertEquals(4, form.optionsPerQuestion)
+        val title = StudyLockPackMetadata.defaultTitle(form, testCatalog)
+        assertTrue(title.contains("数学"))
+        val meta = StudyLockPackMetadata.from(form, testCatalog, title)
+        assertEquals(title, meta.title)
+        assertEquals(1, meta.subject)
+        assertTrue(meta.id.startsWith("tiku_"))
 
         val result = PromptCompiler.build(form, studylock, testCatalog)
         assertEquals(emptyList<String>(), result.errors)
@@ -254,7 +303,6 @@ class PromptPipelineTest {
         assertTrue(prompt.contains("题量：30 道"))
         assertTrue(prompt.contains("难度：较难（只影响题目内容，不输出 difficulty 字段）"))
         assertTrue(prompt.contains("每题选项数：4 个"))
-        assertTrue(prompt.contains("额外要求：只考本单元"))
         assertFalse(prompt.contains("difficulty 使用"))
 
         val invalidOptions = PromptCompiler.build(
@@ -264,6 +312,59 @@ class PromptPipelineTest {
         )
         assertNull(invalidOptions.prompt)
         assertTrue(invalidOptions.errors.any { it.contains("固定") })
+    }
+
+    @Test
+    fun `HaloTV normalizes to strict single choice and caps count and options`() {
+        val form = FormPlanner.normalize(
+            PromptForm(
+                targetId = halotv.id,
+                questionTypes = setOf(
+                    QuestionType.SINGLE,
+                    QuestionType.MULTIPLE,
+                    QuestionType.BOOLEAN,
+                    QuestionType.TEXT,
+                    QuestionType.SUBJECTIVE,
+                ),
+                count = 80,
+                difficulty = DifficultyIntent.HARD,
+                optionsPerQuestion = 6,
+            ),
+            halotv,
+            testCatalog,
+        )
+
+        assertEquals(setOf(QuestionType.SINGLE), form.questionTypes)
+        assertEquals(80, form.count)
+        assertEquals(4, form.optionsPerQuestion)
+
+        val result = PromptCompiler.build(form, halotv, testCatalog)
+        assertEquals(emptyList<String>(), result.errors)
+        val prompt = requireNotNull(result.prompt)
+        assertTrue(prompt.startsWith(halotv.spec.trim()))
+        assertTrue(prompt.contains("题型：单选"))
+        assertFalse(prompt.contains("（single）"))
+        assertTrue(prompt.contains("题量：80 道"))
+        assertTrue(prompt.contains("难度：较难（只影响题目内容，不输出 difficulty 字段）"))
+        assertTrue(prompt.contains("每题选项数：4 个"))
+        assertTrue(prompt.contains("halotv-parent-quiz-v1"))
+        assertFalse(prompt.contains("difficulty 使用"))
+
+        val tooMany = PromptCompiler.build(
+            form.copy(count = 81),
+            halotv,
+            testCatalog,
+        )
+        assertNull(tooMany.prompt)
+        assertTrue(tooMany.errors.any { it.contains("题量") })
+
+        val tooManyOptions = PromptCompiler.build(
+            form.copy(optionsPerQuestion = 5),
+            halotv,
+            testCatalog,
+        )
+        assertNull(tooManyOptions.prompt)
+        assertTrue(tooManyOptions.errors.any { it.contains("选项数") })
     }
 
     @Test
@@ -411,8 +512,6 @@ class PromptPipelineTest {
             difficulty = DifficultyIntent.HARD,
             optionsPerQuestion = 6,
             outputLanguage = OutputLanguage.EN,
-            extraRequirement = "Mixed practice",
-            referenceNotes = "Unit notes",
         )
         val json = Json { encodeDefaults = true }
         val encoded = json.encodeToString(form)

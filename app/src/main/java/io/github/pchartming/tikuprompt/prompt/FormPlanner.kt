@@ -191,12 +191,6 @@ object FormPlanner {
         language: io.github.pchartming.tikuprompt.model.OutputLanguage,
     ): PromptForm = form.copy(outputLanguage = language)
 
-    fun changeExtraRequirement(form: PromptForm, text: String): PromptForm =
-        form.copy(extraRequirement = text)
-
-    fun changeReferenceNotes(form: PromptForm, text: String): PromptForm =
-        form.copy(referenceNotes = text)
-
     fun changeTarget(
         form: PromptForm,
         profile: PromptProfile,

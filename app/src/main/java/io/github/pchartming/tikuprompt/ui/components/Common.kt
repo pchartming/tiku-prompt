@@ -42,9 +42,13 @@ import androidx.compose.ui.unit.dp
 fun SectionBlock(
     title: String,
     subtitle: String? = null,
+    modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
